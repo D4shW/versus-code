@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Édition du fichier</title>
+</head>
+<body>
+  <h1>Éditeur de fichier</h1>
+  <form action="/save" method="POST">
+    <input type="hidden" name="filePath" value="<%= filePath %>">
+    <textarea name="content" rows="20" cols="80"><%= content %></textarea><br>
+    <button type="submit">Sauvegarder</button>
+  </form>
+</body>
+</html>
