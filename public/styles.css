@@ -1,0 +1,104 @@
+/* Styles généraux */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body, html {
+    font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+    height: 100%;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    overflow: hidden;
+  }
+  
+  /* Styles personnalisés pour l'éditeur */
+  #editor {
+    width: 100%;
+    height: 100%;
+  }
+  
+  /* Animation pour le toast */
+  @keyframes slideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  /* Styles pour les toast notifications */
+  .toast {
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  /* Styling scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #2d2d2d;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #777;
+  }
+  
+  /* Transitions et animations */
+  .transition-all {
+    transition: all 0.2s ease;
+  }
+  
+  /* Styles spécifiques pour ressembler à VSCode */
+  .vs-code-sidebar-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .vs-code-sidebar-item.active {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  
+  /* Styles pour les animations de chargement */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  .monaco-editor .overflow-guard {
+    border-radius: 4px;
+  }
+  
+  /* Ajouter des animations pour l'interface */
+  .fade-enter-active, .fade-leave-active {
+    transition: opacity 0.3s;
+  }
+  .fade-enter, .fade-leave-to {
+    opacity: 0;
+  }
+  
+  /* Responsive design pour les appareils mobiles */
+  @media (max-width: 768px) {
+    aside {
+      width: 180px !important;
+    }
+  }
+  
+  @media (max-width: 640px) {
+    aside {
+      width: 100% !important;
+      position: absolute;
+      z-index: 10;
+      height: 100%;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+    }
+    
+    aside.open {
+      transform: translateX(0);
+    }
+  }

@@ -3,13 +3,61 @@
 <head>
   <meta charset="UTF-8">
   <title>Édition du fichier</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <style>
+    textarea {
+      width: 100%;
+      height: 400px;
+      font-family: monospace;
+      font-size: 1em;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Éditeur de fichier</h1>
-  <form action="/save" method="POST">
-    <input type="hidden" name="filePath" value="<%= filePath %>">
-    <textarea name="content" rows="20" cols="80"><%= content %></textarea><br>
-    <button type="submit">Sauvegarder</button>
-  </form>
+  <h1>Éditeur Vue.js</h1>
+
+  <div id="app">
+    <form @submit.prevent="saveFile">
+      <textarea v-model="fileContent"></textarea>
+      <button type="submit">💾 Sauvegarder</button>
+    </form>
+
+    <p v-if="successMessage" style="color: green">{{ successMessage }}</p>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          fileContent: `<%- JSON.stringify(content).slice(1, -1) %>`,
+          filePath: `<%= filePath %>`,
+          successMessage: ''
+        };
+      },
+      methods: {
+        async saveFile() {
+          const response = await fetch('/save', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+              content: this.fileContent,
+              filePath: this.filePath
+            })
+          });
+
+          const text = await response.text();
+          this.successMessage = 'Fichier sauvegardé !';
+        }
+      }
+    }).mount('#app');
+  </script>
 </body>
 </html>

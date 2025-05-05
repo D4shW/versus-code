@@ -2,13 +2,408 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Mini-VSCode - Upload</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VersusCode - Éditeur de Code</title>
+  <!-- Chargement de Vue.js depuis CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <!-- Ajout de Monaco Editor (comme VSCode) -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs/loader.js"></script>
+  <!-- Tailwind CSS pour le style -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Boxicons pour les icônes -->
+  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+  <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-  <h1>Uploader un fichier texte</h1>
-  <form action="/upload" method="POST" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".txt,.js,.html,.css" required>
-    <button type="submit">Envoyer</button>
-  </form>
+<body class="bg-gray-900 text-white h-screen overflow-hidden">
+  <div id="app" class="h-full flex flex-col">
+    <!-- En-tête de l'application -->
+    <header class="bg-gray-800 p-3 flex items-center justify-between border-b border-gray-700">
+      <div class="flex items-center space-x-3">
+        <h1 class="text-xl font-bold text-blue-400">VersusCode</h1>
+        <nav class="hidden md:flex space-x-4">
+          <button class="hover:text-blue-300">Fichier</button>
+          <button class="hover:text-blue-300">Édition</button>
+          <button class="hover:text-blue-300">Affichage</button>
+        </nav>
+      </div>
+      <div class="flex items-center space-x-4">
+        <label for="file-upload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm flex items-center">
+          <i class='bx bx-upload mr-1'></i> Importer
+          <input id="file-upload" type="file" class="hidden" @change="uploadFile" accept=".txt,.js,.html,.css,.go,.py">
+        </label>
+        <button @click="saveFile" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center" :disabled="!currentFile">
+          <i class='bx bx-save mr-1'></i> Sauvegarder
+        </button>
+      </div>
+    </header>
+    
+    <!-- Corps principal -->
+    <main class="flex flex-1 overflow-hidden">
+      <!-- Barre latérale pour l'explorateur de fichiers -->
+      <aside class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
+        <div class="p-2 text-gray-400 font-semibold flex items-center justify-between">
+          <span>EXPLORATEUR</span>
+          <div class="flex items-center space-x-2">
+            <button @click="showNewFileModal = true" class="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white flex items-center" title="Nouveau fichier">
+              <i class='bx bx-plus'></i> Nouveau
+            </button>
+            <button @click="fetchFiles" class="hover:text-blue-300" title="Rafraîchir">
+              <i class='bx bx-refresh'></i>
+            </button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-2 space-y-1">
+          <div v-if="loading" class="text-center py-4 text-gray-500">
+            <i class='bx bx-loader-alt bx-spin text-xl'></i>
+            <p>Chargement...</p>
+          </div>
+          <div v-else-if="files.length === 0" class="text-center py-4 text-gray-500">
+            <i class='bx bx-file text-xl'></i>
+            <p>Aucun fichier</p>
+          </div>
+          <div v-else>
+            <div 
+              v-for="file in files" 
+              :key="file.name" 
+              @click="openFile(file.name)" 
+              class="cursor-pointer p-2 hover:bg-gray-700 rounded flex items-center"
+              :class="{'bg-gray-700': currentFile && currentFile.id === file.name}"
+            >
+              <i class='bx bx-code-alt mr-2 text-blue-400'></i>
+              <span class="truncate">{{ file.name }}</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+      
+      <!-- Éditeur de code principal -->
+      <section class="flex-1 flex flex-col bg-gray-900">
+        <div v-if="!currentFile" class="flex-1 flex items-center justify-center text-gray-400 flex-col">
+          <i class='bx bx-code-curly text-6xl mb-4'></i>
+          <h2 class="text-xl mb-4">Bienvenue sur VersusCode</h2>
+          <p class="text-center max-w-md">
+            Importez un fichier ou sélectionnez-en un dans l'explorateur pour commencer à éditer.
+          </p>
+        </div>
+        <div v-else class="flex-1 flex flex-col">
+          <div class="bg-gray-800 px-3 py-2 text-sm border-b border-gray-700 flex items-center">
+            <i class='bx bx-code-alt text-blue-400 mr-2'></i>
+            <span>{{ currentFile.id }}</span>
+          </div>
+          <div id="editor" class="flex-1"></div>
+        </div>
+      </section>
+    </main>
+    
+    <!-- Barre d'état en bas -->
+    <footer class="bg-blue-600 text-white p-1 text-xs flex items-center">
+      <div class="ml-2">{{ statusMessage }}</div>
+      <div class="flex-1"></div>
+      <div class="mr-2" v-if="currentFile">UTF-8</div>
+    </footer>
+    
+    <!-- Toast notifications -->
+    <div class="fixed bottom-5 right-5 z-50">
+      <div v-for="(toast, index) in toasts" :key="index" 
+           class="mb-2 p-3 rounded shadow-lg max-w-sm transition-all"
+           :class="toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'">
+        {{ toast.message }}
+      </div>
+    </div>
+    
+    <!-- Modal pour créer un nouveau fichier -->
+    <div v-if="showNewFileModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 border border-gray-700">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-medium text-blue-400">Créer un nouveau fichier</h3>
+          <button @click="showNewFileModal = false" class="text-gray-400 hover:text-white">
+            <i class='bx bx-x text-2xl'></i>
+          </button>
+        </div>
+        
+        <form @submit.prevent="createNewFile">
+          <div class="mb-4">
+            <label for="fileName" class="block mb-2 text-sm font-medium text-gray-300">Nom du fichier</label>
+            <input type="text" id="fileName" v-model="newFileName" 
+                  class="bg-gray-700 border border-gray-600 text-white text-sm rounded block w-full p-2.5 focus:ring-blue-500 focus:border-blue-500" 
+                  placeholder="exemple.js" required>
+          </div>
+          
+          <div class="mb-4">
+            <label for="fileType" class="block mb-2 text-sm font-medium text-gray-300">Type de fichier</label>
+            <select id="fileType" v-model="newFileType" 
+                   class="bg-gray-700 border border-gray-600 text-white text-sm rounded block w-full p-2.5 focus:ring-blue-500 focus:border-blue-500">
+              <option value="js">JavaScript (.js)</option>
+              <option value="html">HTML (.html)</option>
+              <option value="css">CSS (.css)</option>
+              <option value="py">Python (.py)</option>
+              <option value="go">Go (.go)</option>
+              <option value="txt">Texte (.txt)</option>
+            </select>
+          </div>
+          
+          <div class="flex justify-end space-x-3">
+            <button type="button" @click="showNewFileModal = false"
+                   class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded">
+              Annuler
+            </button>
+            <button type="submit"
+                   class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">
+              Créer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Attendre que Monaco Editor soit chargé
+    let editor = null;
+
+    // Configuration de Monaco Editor
+    function initMonaco() {
+      require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs' }});
+      window.MonacoEnvironment = { getWorkerUrl: () => proxy };
+      
+      let proxy = URL.createObjectURL(new Blob([`
+        self.MonacoEnvironment = {
+          baseUrl: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/'
+        };
+        importScripts('https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs/base/worker/workerMain.js');
+      `], { type: 'text/javascript' }));
+    }
+
+    initMonaco();
+
+    // Création de l'application Vue
+    const { createApp } = Vue;
+    
+    createApp({
+      data() {
+        return {
+          files: [],
+          currentFile: null,
+          loading: false,
+          statusMessage: 'Prêt',
+          toasts: [],
+          showNewFileModal: false,
+          newFileName: '',
+          newFileType: 'js'
+        }
+      },
+      mounted() {
+        this.fetchFiles();
+      },
+      methods: {
+        // Récupère la liste des fichiers
+        async fetchFiles() {
+          this.loading = true;
+          try {
+            const response = await fetch('/api/files');
+            const data = await response.json();
+            this.files = data.files || [];
+            this.statusMessage = `${this.files.length} fichier(s) trouvé(s)`;
+          } catch (error) {
+            this.showToast('Erreur lors du chargement des fichiers', 'error');
+          } finally {
+            this.loading = false;
+          }
+        },
+        
+        // Ouvre un fichier dans l'éditeur
+        async openFile(fileId) {
+          this.statusMessage = `Ouverture de ${fileId}...`;
+          try {
+            const response = await fetch(`/api/files/${fileId}`);
+            const data = await response.json();
+            
+            this.currentFile = {
+              id: fileId,
+              content: data.content
+            };
+            
+            this.initEditor(data.content);
+            this.statusMessage = `Fichier ${fileId} ouvert`;
+          } catch (error) {
+            this.showToast(`Erreur lors de l'ouverture du fichier: ${fileId}`, 'error');
+            this.statusMessage = 'Prêt';
+          }
+        },
+        
+        // Initialise l'éditeur Monaco
+        initEditor(content) {
+          require(['vs/editor/editor.main'], () => {
+            if (editor) {
+              editor.dispose();
+            }
+            
+            const langMap = {
+              'js': 'javascript',
+              'py': 'python',
+              'html': 'html',
+              'css': 'css',
+              'go': 'go',
+              'txt': 'plaintext'
+            };
+            
+            // Déterminer le langage en fonction de l'extension du fichier
+            const fileExt = this.currentFile.id.split('.').pop();
+            const language = langMap[fileExt] || 'plaintext';
+            
+            editor = monaco.editor.create(document.getElementById('editor'), {
+              value: content,
+              language: language,
+              theme: 'vs-dark',
+              automaticLayout: true,
+              minimap: {
+                enabled: true
+              },
+              scrollBeyondLastLine: false,
+              fontSize: 14,
+              lineNumbers: 'on',
+              roundedSelection: true,
+              scrollBeyondLastLine: false,
+              readOnly: false,
+              cursorStyle: 'line',
+              autoIndent: 'full'
+            });
+          });
+        },
+        
+        // Télécharge et ouvre un fichier
+        async uploadFile(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          this.statusMessage = `Téléchargement de ${file.name}...`;
+          
+          try {
+            const response = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              this.showToast('Fichier téléchargé avec succès', 'success');
+              this.currentFile = {
+                id: data.fileId,
+                content: data.content
+              };
+              
+              this.initEditor(data.content);
+              this.fetchFiles();
+              this.statusMessage = `Fichier ${file.name} téléchargé et ouvert`;
+            } else {
+              throw new Error(data.error || 'Erreur lors du téléchargement');
+            }
+          } catch (error) {
+            this.showToast(`Erreur: ${error.message}`, 'error');
+            this.statusMessage = 'Prêt';
+          }
+          
+          // Réinitialiser l'input file
+          event.target.value = '';
+        },
+        
+        // Sauvegarde le fichier courant
+        async saveFile() {
+          if (!this.currentFile || !editor) return;
+          
+          const content = editor.getValue();
+          this.statusMessage = 'Sauvegarde en cours...';
+          
+          try {
+            const response = await fetch('/api/save', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                fileId: this.currentFile.id,
+                content: content
+              })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              this.showToast('Fichier sauvegardé avec succès', 'success');
+              this.statusMessage = `Fichier ${this.currentFile.id} sauvegardé`;
+            } else {
+              throw new Error(data.error || 'Erreur lors de la sauvegarde');
+            }
+          } catch (error) {
+            this.showToast(`Erreur: ${error.message}`, 'error');
+            this.statusMessage = 'Prêt';
+          }
+        },
+        
+        // Affiche un toast de notification
+        showToast(message, type = 'success') {
+          const toast = { message, type };
+          this.toasts.push(toast);
+          
+          // Retirer le toast après 3 secondes
+          setTimeout(() => {
+            const index = this.toasts.indexOf(toast);
+            if (index !== -1) {
+              this.toasts.splice(index, 1);
+            }
+          }, 3000);
+        },
+        
+        // Crée un nouveau fichier
+        async createNewFile() {
+          if (!this.newFileName) {
+            this.showToast('Veuillez saisir un nom de fichier', 'error');
+            return;
+          }
+          
+          // Vérifier si le nom de fichier contient déjà une extension
+          let fileName = this.newFileName;
+          if (!fileName.includes('.')) {
+            fileName = `${fileName}.${this.newFileType}`;
+          }
+          
+          this.statusMessage = `Création du fichier ${fileName}...`;
+          
+          try {
+            const response = await fetch('/api/create', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                fileName: fileName,
+                content: ''
+              })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              this.showToast(`Fichier ${fileName} créé avec succès`, 'success');
+              this.fetchFiles();
+              this.openFile(data.fileId);
+              this.showNewFileModal = false;
+              this.newFileName = '';
+              this.statusMessage = `Fichier ${fileName} créé et ouvert`;
+            } else {
+              throw new Error(data.error || 'Erreur lors de la création du fichier');
+            }
+          } catch (error) {
+            this.showToast(`Erreur: ${error.message}`, 'error');
+            this.statusMessage = 'Prêt';
+          }
+        }
+      }
+    }).mount('#app');
+  </script>
 </body>
 </html>
