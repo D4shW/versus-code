@@ -18,13 +18,8 @@
   <div id="app" class="h-full flex flex-col">
     <!-- En-tête de l'application -->
     <header class="bg-gray-800 p-3 flex items-center justify-between border-b border-gray-700">
-      <div class="flex items-center space-x-3">
+      <div class="flex items-center">
         <h1 class="text-xl font-bold text-blue-400">VersusCode</h1>
-        <nav class="hidden md:flex space-x-4">
-          <button class="hover:text-blue-300">Fichier</button>
-          <button class="hover:text-blue-300">Édition</button>
-          <button class="hover:text-blue-300">Affichage</button>
-        </nav>
       </div>
       <div class="flex items-center space-x-4">
         <label for="file-upload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm flex items-center">
@@ -47,8 +42,8 @@
         <div class="p-2 text-gray-400 font-semibold flex items-center justify-between">
           <span>EXPLORATEUR</span>
           <div class="flex items-center space-x-2">
-            <button @click="showNewFileModal = true" class="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white flex items-center" title="Nouveau fichier">
-              <i class='bx bx-plus'></i> Nouveau
+            <button @click="showNewFileModal = true" class="bg-blue-600 hover:bg-blue-700 p-1 rounded text-white flex items-center" title="Nouveau fichier">
+              <i class='bx bx-plus'></i>
             </button>
             <button @click="loadFiles" class="hover:text-blue-300" title="Rafraîchir">
               <i class='bx bx-refresh'></i>
