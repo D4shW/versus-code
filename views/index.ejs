@@ -42,10 +42,13 @@
         <div class="p-2 text-gray-400 font-semibold flex items-center justify-between">
           <span>EXPLORATEUR</span>
           <div class="flex items-center space-x-2">
-            <button @click="showNewFileModal = true" class="bg-blue-600 hover:bg-blue-700 p-1 rounded text-white flex items-center" title="Nouveau fichier">
+            <button @click="showCreateModal = true; createModalType = 'file'" class="bg-blue-600 hover:bg-blue-700 p-1 rounded text-white flex items-center" title="Nouveau fichier">
               <i class='bx bx-plus'></i>
             </button>
-            <button @click="loadFiles" class="hover:text-blue-300" title="Rafraîchir">
+            <button @click="showCreateModal = true; createModalType = 'folder'" class="bg-blue-600 hover:bg-blue-700 p-1 rounded text-white flex items-center" title="Nouveau dossier">
+              <i class='bx bx-folder-plus'></i>
+            </button>
+            <button @click="loadFileTree" class="hover:text-blue-300" title="Rafraîchir">
               <i class='bx bx-refresh'></i>
             </button>
           </div>
@@ -55,30 +58,35 @@
             <i class='bx bx-loader-alt bx-spin text-xl'></i>
             <p>Chargement...</p>
           </div>
-          <div v-else-if="files.length === 0" class="text-center py-4 text-gray-500">
+          <div v-else-if="fileTree.folders.length === 0 && fileTree.files.length === 0" class="text-center py-4 text-gray-500">
             <i class='bx bx-file text-xl'></i>
             <p>Aucun fichier</p>
           </div>
           <div v-else>
-            <div 
-              v-for="file in files" 
-              :key="file.id" 
-              @click="openFile(file.id)" 
-              class="cursor-pointer p-2 hover:bg-gray-700 rounded flex items-center justify-between group"
-              :class="{'bg-gray-700': currentFile && currentFile.id === file.id}"
-            >
-              <div class="flex items-center truncate">
-                <i class='bx bx-code-alt mr-2 text-blue-400'></i>
-                <span class="truncate">{{ file.name }}</span>
-              </div>
-              <button 
-                @click.stop="deleteFile(file.id)" 
-                class="text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Supprimer"
-              >
-                <i class='bx bx-trash'></i>
-              </button>
-            </div>
+            <!-- Rendu récursif des dossiers et fichiers -->
+            <file-tree-item 
+              v-for="folder in fileTree.folders" 
+              :key="'folder-' + folder.id" 
+              :item="folder" 
+              :type="'folder'"
+              :depth="0"
+              @open-file="openFile" 
+              @toggle-folder="toggleFolder"
+              @delete-item="confirmDeleteItem"
+              @create-in-folder="createInFolder"
+              @rename-item="startRenameItem"
+            ></file-tree-item>
+            
+            <file-tree-item 
+              v-for="file in fileTree.files" 
+              :key="'file-' + file.id" 
+              :item="file" 
+              :type="'file'"
+              :depth="0"
+              @open-file="openFile" 
+              @delete-item="confirmDeleteItem"
+              @rename-item="startRenameItem"
+            ></file-tree-item>
           </div>
         </div>
       </aside>
@@ -96,7 +104,7 @@
           <div class="bg-gray-800 px-3 py-2 text-sm border-b border-gray-700 flex items-center justify-between">
             <div class="flex items-center">
               <i class='bx bx-code-alt text-blue-400 mr-2'></i>
-              <span>{{ currentFile.name }}</span>
+              <span>{{ currentFile.path }}</span>
             </div>
             <div v-if="currentFile.unsaved" class="text-orange-400 text-xs">
               <i class='bx bx-circle'></i> Non sauvegardé
@@ -123,25 +131,35 @@
       </div>
     </div>
     
-    <!-- Modal pour créer un nouveau fichier -->
-    <div v-if="showNewFileModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <!-- Modal pour créer un nouveau fichier ou dossier -->
+    <div v-if="showCreateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 border border-gray-700">
         <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-medium text-blue-400">Créer un nouveau fichier</h3>
-          <button @click="showNewFileModal = false" class="text-gray-400 hover:text-white">
+          <h3 class="text-xl font-medium text-blue-400">
+            {{ createModalType === 'file' ? 'Créer un nouveau fichier' : 'Créer un nouveau dossier' }}
+            <span v-if="createInFolderPath" class="text-sm text-gray-400 block mt-1">
+              dans {{ createInFolderPath }}
+            </span>
+          </h3>
+          <button @click="showCreateModal = false" class="text-gray-400 hover:text-white">
             <i class='bx bx-x text-2xl'></i>
           </button>
         </div>
         
-        <form @submit.prevent="createNewFile">
+        <form @submit.prevent="createNewItem">
           <div class="mb-4">
-            <label for="fileName" class="block mb-2 text-sm font-medium text-gray-300">Nom du fichier</label>
-            <input type="text" id="fileName" v-model="newFileName" 
+            <label :for="createModalType === 'file' ? 'fileName' : 'folderName'" class="block mb-2 text-sm font-medium text-gray-300">
+              {{ createModalType === 'file' ? 'Nom du fichier' : 'Nom du dossier' }}
+            </label>
+            <input type="text" 
+                  :id="createModalType === 'file' ? 'fileName' : 'folderName'" 
+                  v-model="newItemName" 
                   class="bg-gray-700 border border-gray-600 text-white text-sm rounded block w-full p-2.5 focus:ring-blue-500 focus:border-blue-500" 
-                  placeholder="exemple" required>
+                  :placeholder="createModalType === 'file' ? 'exemple' : 'nouveau-dossier'" 
+                  required>
           </div>
           
-          <div class="mb-4">
+          <div class="mb-4" v-if="createModalType === 'file'">
             <label for="fileType" class="block mb-2 text-sm font-medium text-gray-300">Type de fichier</label>
             <select id="fileType" v-model="newFileType" 
                    class="bg-gray-700 border border-gray-600 text-white text-sm rounded block w-full p-2.5 focus:ring-blue-500 focus:border-blue-500">
@@ -155,7 +173,7 @@
           </div>
           
           <div class="flex justify-end space-x-3">
-            <button type="button" @click="showNewFileModal = false"
+            <button type="button" @click="showCreateModal = false"
                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded">
               Annuler
             </button>
@@ -167,7 +185,136 @@
         </form>
       </div>
     </div>
+    
+    <!-- Modal pour renommer un élément -->
+    <div v-if="showRenameModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 border border-gray-700">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-medium text-blue-400">
+            Renommer {{ renameItem.type === 'file' ? 'le fichier' : 'le dossier' }}
+          </h3>
+          <button @click="showRenameModal = false" class="text-gray-400 hover:text-white">
+            <i class='bx bx-x text-2xl'></i>
+          </button>
+        </div>
+        
+        <form @submit.prevent="renameItemConfirm">
+          <div class="mb-4">
+            <label for="newName" class="block mb-2 text-sm font-medium text-gray-300">
+              Nouveau nom
+            </label>
+            <input type="text" 
+                  id="newName" 
+                  v-model="newItemName" 
+                  class="bg-gray-700 border border-gray-600 text-white text-sm rounded block w-full p-2.5 focus:ring-blue-500 focus:border-blue-500" 
+                  required>
+          </div>
+          
+          <div class="flex justify-end space-x-3">
+            <button type="button" @click="showRenameModal = false"
+                   class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded">
+              Annuler
+            </button>
+            <button type="submit"
+                   class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">
+              Renommer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
+
+  <!-- Composant récursif pour l'arborescence des fichiers -->
+  <template id="file-tree-item-template">
+    <div 
+      class="file-tree-item"
+      :style="{ paddingLeft: `${depth * 16}px` }"
+    >
+      <!-- Dossier -->
+      <template v-if="type === 'folder'">
+        <div 
+          class="flex items-center justify-between p-1 hover:bg-gray-700 rounded cursor-pointer group relative"
+          @click="toggleFolder(item)"
+        >
+          <div class="flex items-center flex-grow truncate">
+            <i 
+              :class="[
+                'bx mr-1', 
+                item.isExpanded ? 'bx-folder-open text-yellow-400' : 'bx-folder text-yellow-400'
+              ]"
+            ></i>
+            <span class="truncate">{{ item.name }}</span>
+          </div>
+          <div class="flex opacity-0 group-hover:opacity-100 transition-opacity">
+            <button @click.stop="$emit('create-in-folder', item, 'file')" title="Nouveau fichier" class="text-gray-400 hover:text-blue-400 mx-1">
+              <i class='bx bx-file-blank'></i>
+            </button>
+            <button @click.stop="$emit('create-in-folder', item, 'folder')" title="Nouveau dossier" class="text-gray-400 hover:text-blue-400 mx-1">
+              <i class='bx bx-folder-plus'></i>
+            </button>
+            <button @click.stop="$emit('rename-item', { type, item })" title="Renommer" class="text-gray-400 hover:text-yellow-400 mx-1">
+              <i class='bx bx-rename'></i>
+            </button>
+            <button @click.stop="$emit('delete-item', { type, item })" title="Supprimer" class="text-gray-400 hover:text-red-400 mx-1">
+              <i class='bx bx-trash'></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Contenu du dossier (rendu récursif si déplié) -->
+        <div v-if="item.isExpanded" class="ml-1 pl-1 border-l border-gray-600">
+          <!-- Dossiers enfants -->
+          <file-tree-item 
+            v-for="childFolder in item.folders" 
+            :key="'folder-' + childFolder.id" 
+            :item="childFolder" 
+            :type="'folder'"
+            :depth="depth + 1"
+            @open-file="$emit('open-file', $event)" 
+            @toggle-folder="$emit('toggle-folder', $event)"
+            @delete-item="$emit('delete-item', $event)"
+            @create-in-folder="$emit('create-in-folder', $event, $event2)"
+            @rename-item="$emit('rename-item', $event)"
+          ></file-tree-item>
+          
+          <!-- Fichiers dans ce dossier -->
+          <file-tree-item 
+            v-for="childFile in item.files" 
+            :key="'file-' + childFile.id" 
+            :item="childFile" 
+            :type="'file'"
+            :depth="depth + 1"
+            @open-file="$emit('open-file', $event)" 
+            @delete-item="$emit('delete-item', $event)"
+            @rename-item="$emit('rename-item', $event)"
+          ></file-tree-item>
+        </div>
+      </template>
+      
+      <!-- Fichier -->
+      <template v-else>
+        <div 
+          @click="$emit('open-file', item)"
+          class="flex items-center justify-between p-1 hover:bg-gray-700 rounded cursor-pointer group"
+          :class="{'bg-gray-700': isActive}"
+        >
+          <div class="flex items-center truncate">
+            <i class="bx mr-1" :class="getFileIcon(item.name)"></i>
+            <span class="truncate">{{ item.name }}</span>
+          </div>
+          <div class="flex opacity-0 group-hover:opacity-100 transition-opacity">
+            <button @click.stop="$emit('rename-item', { type, item })" title="Renommer" class="text-gray-400 hover:text-yellow-400 mx-1">
+              <i class='bx bx-rename'></i>
+            </button>
+            <button @click.stop="$emit('delete-item', { type, item })" title="Supprimer" class="text-gray-400 hover:text-red-400 mx-1">
+              <i class='bx bx-trash'></i>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
 
   <script>
     // Attendre que Monaco Editor soit chargé
@@ -189,88 +336,222 @@
 
     initMonaco();
 
+    // Créer le composant récursif pour l'arborescence des fichiers
+    const FileTreeItem = {
+      name: 'FileTreeItem',
+      template: '#file-tree-item-template',
+      props: {
+        item: Object,
+        type: String,
+        depth: {
+          type: Number,
+          default: 0
+        }
+      },
+      computed: {
+        isActive() {
+          // Comparaison avec le fichier actuel
+          return this.$root.currentFile && this.$root.currentFile.id === this.item.id;
+        }
+      },
+      methods: {
+        toggleFolder(folder) {
+          this.$emit('toggle-folder', folder);
+        },
+        getFileIcon(fileName) {
+          const ext = fileName.split('.').pop().toLowerCase();
+          const iconMap = {
+            'js': 'bx-code-alt text-yellow-300',
+            'html': 'bx-code text-orange-400',
+            'css': 'bx-palette text-blue-400',
+            'py': 'bx-code-curly text-green-400',
+            'go': 'bx-code-block text-blue-300',
+            'txt': 'bx-file text-gray-400',
+            'md': 'bx-book text-white',
+            'json': 'bx-brackets-curly text-yellow-200',
+          };
+          
+          return iconMap[ext] || 'bx-file text-gray-400';
+        }
+      }
+    };
+
     // Création de l'application Vue
     const { createApp } = Vue;
     
-    createApp({
+    const app = createApp({
+      components: {
+        FileTreeItem
+      },
       data() {
         return {
-          files: [],
+          // Structure arborescente des fichiers
+          fileTree: {
+            folders: [],
+            files: []
+          },
           currentFile: null,
           loading: false,
           statusMessage: 'Prêt',
           toasts: [],
-          showNewFileModal: false,
-          newFileName: '',
+          
+          // Modals
+          showCreateModal: false,
+          createModalType: 'file', // 'file' ou 'folder'
+          newItemName: '',
           newFileType: 'js',
-          // Map to store FileSystemFileHandle objects
+          createInFolderPath: null,
+          createInFolderId: null,
+          
+          showRenameModal: false,
+          renameItem: null,
+          
+          // Pour le système de fichiers local
           fileHandles: new Map(),
           hasFileSystemAccessAPI: false
         }
       },
       mounted() {
-        this.loadFiles();
+        this.loadFileTree();
         
         // Vérifie les capacités du navigateur
         this.checkBrowserCapabilities();
       },
       methods: {
-        // Sauvegarde les données dans localStorage
-        saveToLocalStorage() {
-          // Nous ne pouvons pas stocker les fileHandle directement dans localStorage
-          const serializedFiles = this.files.map(file => ({
-            ...file,
-            hasFileHandle: this.fileHandles.has(file.id)
-          }));
-          
-          localStorage.setItem('versusCodeFiles', JSON.stringify(serializedFiles));
+        // Génère un identifiant unique
+        generateId() {
+          return Date.now().toString() + Math.floor(Math.random() * 1000);
         },
         
-        // Charge les fichiers depuis localStorage
-        loadFiles() {
+        // Sauvegarde l'arborescence dans localStorage
+        saveFileTree() {
+          try {
+            // Les fileHandles ne peuvent pas être sérialisés
+            const serializedTree = JSON.stringify(this.fileTree);
+            localStorage.setItem('versusCodeFileTree', serializedTree);
+          } catch (error) {
+            console.error('Erreur lors de la sauvegarde de l\'arborescence:', error);
+            this.showToast('Erreur lors de la sauvegarde de l\'arborescence', 'error');
+          }
+        },
+        
+        // Charge l'arborescence depuis localStorage
+        loadFileTree() {
           this.loading = true;
           
           try {
-            const storedFiles = localStorage.getItem('versusCodeFiles');
-            if (storedFiles) {
-              this.files = JSON.parse(storedFiles);
-              // Les fileHandles ne peuvent pas être persistés entre les sessions
-              this.fileHandles = new Map();
+            const storedTree = localStorage.getItem('versusCodeFileTree');
+            
+            if (storedTree) {
+              this.fileTree = JSON.parse(storedTree);
             } else {
-              this.files = [];
+              // Initialiser une arborescence vide
+              this.fileTree = {
+                folders: [],
+                files: []
+              };
             }
-            this.statusMessage = `${this.files.length} fichier(s) trouvé(s)`;
+            
+            // Compter les fichiers et dossiers
+            const fileCount = this.countFiles(this.fileTree);
+            const folderCount = this.countFolders(this.fileTree);
+            
+            this.statusMessage = `${folderCount} dossier(s), ${fileCount} fichier(s)`;
           } catch (error) {
-            this.showToast('Erreur lors du chargement des fichiers', 'error');
+            console.error('Erreur lors du chargement de l\'arborescence:', error);
+            this.showToast('Erreur lors du chargement de l\'arborescence', 'error');
+            
+            // Réinitialiser en cas d'erreur
+            this.fileTree = {
+              folders: [],
+              files: []
+            };
           } finally {
             this.loading = false;
           }
         },
         
-        // Ouvre un fichier dans l'éditeur
-        openFile(fileId) {
-          const file = this.files.find(f => f.id === fileId);
-          if (!file) {
-            this.showToast(`Fichier non trouvé: ${fileId}`, 'error');
-            return;
+        // Compte le nombre total de fichiers dans l'arborescence
+        countFiles(node) {
+          let count = node.files ? node.files.length : 0;
+          
+          if (node.folders) {
+            for (const folder of node.folders) {
+              count += this.countFiles(folder);
+            }
           }
           
+          return count;
+        },
+        
+        // Compte le nombre total de dossiers dans l'arborescence
+        countFolders(node) {
+          let count = node.folders ? node.folders.length : 0;
+          
+          if (node.folders) {
+            for (const folder of node.folders) {
+              count += this.countFolders(folder);
+            }
+          }
+          
+          return count;
+        },
+        
+        // Ouvre un fichier dans l'éditeur
+        openFile(file) {
           this.statusMessage = `Ouverture de ${file.name}...`;
           
           try {
+            // Construire le chemin complet
+            const path = this.getFilePath(file);
+            
             this.currentFile = {
               id: file.id,
               name: file.name,
               content: file.content,
+              path: path,
               unsaved: false
             };
             
             this.initEditor(file.content, this.getFileLanguage(file.name));
             this.statusMessage = `Fichier ${file.name} ouvert`;
           } catch (error) {
+            console.error('Erreur lors de l\'ouverture du fichier:', error);
             this.showToast(`Erreur lors de l'ouverture du fichier: ${file.name}`, 'error');
             this.statusMessage = 'Prêt';
           }
+        },
+        
+        // Récupère le chemin d'accès complet d'un fichier
+        getFilePath(file, currentPath = '') {
+          // Si nous connaissons déjà le chemin complet
+          if (file.fullPath) return file.fullPath;
+          
+          // Recherche dans la structure arborescente
+          return this.findFilePath(this.fileTree, file.id) || file.name;
+        },
+        
+        // Recherche récursive du chemin d'un fichier
+        findFilePath(node, fileId, currentPath = '') {
+          // Vérifier parmi les fichiers de ce nœud
+          if (node.files) {
+            for (const file of node.files) {
+              if (file.id === fileId) {
+                return currentPath ? `${currentPath}/${file.name}` : file.name;
+              }
+            }
+          }
+          
+          // Vérifier récursivement dans les dossiers
+          if (node.folders) {
+            for (const folder of node.folders) {
+              const path = currentPath ? `${currentPath}/${folder.name}` : folder.name;
+              const foundPath = this.findFilePath(folder, fileId, path);
+              if (foundPath) return foundPath;
+            }
+          }
+          
+          return null;
         },
         
         // Initialise l'éditeur Monaco
@@ -315,14 +596,65 @@
             'html': 'html',
             'css': 'css',
             'go': 'go',
-            'txt': 'plaintext'
+            'txt': 'plaintext',
+            'json': 'json',
+            'md': 'markdown'
           };
           
-          const fileExt = fileName.split('.').pop();
+          const fileExt = fileName.split('.').pop().toLowerCase();
           return langMap[fileExt] || 'plaintext';
         },
         
-        // Télécharge et ouvre un fichier
+        // Vérifie si un chemin existe dans l'arborescence
+        pathExists(path) {
+          if (!path) return false;
+          
+          // Diviser le chemin en segments
+          const segments = path.split('/');
+          
+          let currentNode = this.fileTree;
+          
+          for (let i = 0; i < segments.length; i++) {
+            const segment = segments[i];
+            const isLastSegment = i === segments.length - 1;
+            
+            // Si c'est le dernier segment, vérifier s'il existe déjà en tant que fichier dans ce dossier
+            if (isLastSegment) {
+              if (currentNode.files && currentNode.files.some(f => f.name === segment)) {
+                return true;
+              }
+              // Ou si c'est un dossier
+              if (currentNode.folders && currentNode.folders.some(f => f.name === segment)) {
+                return true;
+              }
+              return false;
+            }
+            
+            // Sinon, descendre dans l'arborescence
+            let found = false;
+            if (currentNode.folders) {
+              for (const folder of currentNode.folders) {
+                if (folder.name === segment) {
+                  currentNode = folder;
+                  found = true;
+                  break;
+                }
+              }
+            }
+            
+            if (!found) return false;
+          }
+          
+          return true;
+        },
+        
+        // Bascule l'état d'expansion d'un dossier
+        toggleFolder(folder) {
+          folder.isExpanded = !folder.isExpanded;
+          this.saveFileTree();
+        },
+        
+        // Télécharge et importe un fichier
         async uploadFile(event) {
           const file = event.target.files[0];
           if (!file) return;
@@ -336,28 +668,25 @@
               const content = e.target.result;
               
               // Générer un ID unique
-              const fileId = Date.now().toString();
+              const fileId = this.generateId();
               
-              // Ajouter le fichier à la liste
-              this.files.push({
+              // Ajouter le fichier à la racine
+              this.fileTree.files.push({
                 id: fileId,
                 name: file.name,
                 content: content,
                 lastModified: new Date().toISOString()
               });
               
-              // Sauvegarder dans localStorage
-              this.saveToLocalStorage();
+              // Sauvegarder l'arborescence
+              this.saveFileTree();
               
               // Ouvrir le fichier importé
-              this.currentFile = {
+              this.openFile({
                 id: fileId,
                 name: file.name,
-                content: content,
-                unsaved: false
-              };
-              
-              this.initEditor(content, this.getFileLanguage(file.name));
+                content: content
+              });
               
               this.showToast('Fichier importé avec succès', 'success');
               this.statusMessage = `Fichier ${file.name} importé et ouvert`;
@@ -377,7 +706,7 @@
           }
         },
         
-        // Sauvegarde le fichier courant dans localStorage
+        // Sauvegarde le fichier courant
         saveFile() {
           if (!this.currentFile || !editor) return;
           
@@ -386,35 +715,54 @@
           try {
             const content = editor.getValue();
             
-            // Mettre à jour le fichier dans la liste
-            const fileIndex = this.files.findIndex(f => f.id === this.currentFile.id);
+            // Trouver et mettre à jour le fichier dans l'arborescence
+            this.updateFileInTree(this.fileTree, this.currentFile.id, content);
             
-            if (fileIndex !== -1) {
-              this.files[fileIndex].content = content;
-              this.files[fileIndex].lastModified = new Date().toISOString();
-              
-              // Sauvegarder dans localStorage
-              this.saveToLocalStorage();
-              
-              // Mettre à jour le fichier courant
-              this.currentFile.content = content;
-              this.currentFile.unsaved = false;
-              
-              this.showToast('Fichier sauvegardé dans l\'application', 'success');
-              this.statusMessage = `Fichier ${this.currentFile.name} sauvegardé`;
-              
-              // Si ce fichier a un fileHandle associé et l'API est disponible,
-              // le sauvegarder aussi sur le disque
-              if (this.hasFileSystemAccessAPI && this.fileHandles.has(this.currentFile.id)) {
-                this.saveFileToHandle(this.currentFile.id, content);
-              }
-            } else {
-              throw new Error('Fichier non trouvé dans la liste');
+            // Sauvegarder l'arborescence
+            this.saveFileTree();
+            
+            // Mettre à jour le fichier courant
+            this.currentFile.content = content;
+            this.currentFile.unsaved = false;
+            
+            this.showToast('Fichier sauvegardé', 'success');
+            this.statusMessage = `Fichier ${this.currentFile.name} sauvegardé`;
+            
+            // Si ce fichier a un fileHandle associé et l'API est disponible,
+            // le sauvegarder aussi sur le disque
+            if (this.hasFileSystemAccessAPI && this.fileHandles.has(this.currentFile.id)) {
+              this.saveFileToHandle(this.currentFile.id, content);
             }
           } catch (error) {
+            console.error('Erreur lors de la sauvegarde:', error);
             this.showToast(`Erreur: ${error.message}`, 'error');
             this.statusMessage = 'Prêt';
           }
+        },
+        
+        // Met à jour le contenu d'un fichier dans l'arborescence
+        updateFileInTree(node, fileId, content) {
+          // Vérifier parmi les fichiers de ce nœud
+          if (node.files) {
+            for (let i = 0; i < node.files.length; i++) {
+              if (node.files[i].id === fileId) {
+                node.files[i].content = content;
+                node.files[i].lastModified = new Date().toISOString();
+                return true;
+              }
+            }
+          }
+          
+          // Vérifier récursivement dans les dossiers
+          if (node.folders) {
+            for (const folder of node.folders) {
+              if (this.updateFileInTree(folder, fileId, content)) {
+                return true;
+              }
+            }
+          }
+          
+          return false;
         },
         
         // Sauvegarde le fichier sur le disque
@@ -450,13 +798,10 @@
               
               // Mettre à jour le nom du fichier dans l'application si nécessaire
               if (this.currentFile.name !== fileHandle.name) {
-                // Mettre à jour dans la liste des fichiers
-                const fileIndex = this.files.findIndex(f => f.id === this.currentFile.id);
-                if (fileIndex !== -1) {
-                  this.files[fileIndex].name = fileHandle.name;
-                  this.currentFile.name = fileHandle.name;
-                  this.saveToLocalStorage();
-                }
+                this.updateFileNameInTree(this.fileTree, this.currentFile.id, fileHandle.name);
+                this.currentFile.name = fileHandle.name;
+                this.currentFile.path = this.getFilePath({id: this.currentFile.id, name: fileHandle.name});
+                this.saveFileTree();
               }
               
               // Marquer comme sauvegardé
@@ -505,6 +850,30 @@
           }
         },
         
+        // Met à jour le nom d'un fichier dans l'arborescence
+        updateFileNameInTree(node, fileId, newName) {
+          // Vérifier parmi les fichiers de ce nœud
+          if (node.files) {
+            for (let i = 0; i < node.files.length; i++) {
+              if (node.files[i].id === fileId) {
+                node.files[i].name = newName;
+                return true;
+              }
+            }
+          }
+          
+          // Vérifier récursivement dans les dossiers
+          if (node.folders) {
+            for (const folder of node.folders) {
+              if (this.updateFileNameInTree(folder, fileId, newName)) {
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        },
+        
         // Sauvegarde le contenu dans un fileHandle existant
         async saveFileToHandle(fileId, content) {
           const fileHandle = this.fileHandles.get(fileId);
@@ -532,14 +901,16 @@
         
         // Retourne le type MIME approprié pour le type de fichier (pour API File System Access)
         getFileAcceptType(fileName) {
-          const extension = fileName.split('.').pop();
+          const extension = fileName.split('.').pop().toLowerCase();
           const mimeTypes = {
             'js': { 'application/javascript': ['.js'] },
             'html': { 'text/html': ['.html'] },
             'css': { 'text/css': ['.css'] },
             'py': { 'text/x-python': ['.py'] },
             'go': { 'text/x-go': ['.go'] },
-            'txt': { 'text/plain': ['.txt'] }
+            'txt': { 'text/plain': ['.txt'] },
+            'json': { 'application/json': ['.json'] },
+            'md': { 'text/markdown': ['.md'] }
           };
           
           return mimeTypes[extension] || { 'text/plain': ['.txt'] };
@@ -547,14 +918,16 @@
         
         // Retourne le type MIME pour un fichier (pour la méthode de téléchargement)
         getMimeType(fileName) {
-          const extension = fileName.split('.').pop();
+          const extension = fileName.split('.').pop().toLowerCase();
           const mimeTypes = {
             'js': 'application/javascript',
             'html': 'text/html',
             'css': 'text/css',
             'py': 'text/x-python',
             'go': 'text/x-go',
-            'txt': 'text/plain'
+            'txt': 'text/plain',
+            'json': 'application/json',
+            'md': 'text/markdown'
           };
           
           return mimeTypes[extension] || 'text/plain';
@@ -563,107 +936,383 @@
         // Vérifie les capacités du navigateur pour l'enregistrement de fichiers
         checkBrowserCapabilities() {
           this.hasFileSystemAccessAPI = 'showSaveFilePicker' in window;
+        },
+        
+        // Initialise la création d'un élément dans un dossier spécifique
+        createInFolder(folder, type) {
+          this.createInFolderId = folder.id;
+          // Construire le chemin du dossier
+          this.createInFolderPath = this.getFilePath(folder);
           
-          // Si l'API File System Access n'est pas disponible, on modifie le texte du bouton
-          if (!this.hasFileSystemAccessAPI) {
-            // Pas de message d'erreur, nous avons une alternative
-            // On peut personnaliser l'interface selon les capacités du navigateur
+          this.createModalType = type;
+          this.newItemName = '';
+          this.showCreateModal = true;
+        },
+        
+        // Crée un nouveau fichier ou dossier
+        createNewItem() {
+          if (!this.newItemName) {
+            this.showToast('Veuillez saisir un nom', 'error');
+            return;
+          }
+          
+          try {
+            if (this.createModalType === 'file') {
+              this.createNewFile();
+            } else {
+              this.createNewFolder();
+            }
+            
+            this.showCreateModal = false;
+            this.createInFolderId = null;
+            this.createInFolderPath = null;
+          } catch (error) {
+            this.showToast(`Erreur: ${error.message}`, 'error');
           }
         },
         
         // Crée un nouveau fichier
         createNewFile() {
-          if (!this.newFileName) {
-            this.showToast('Veuillez saisir un nom de fichier', 'error');
-            return;
-          }
-          
           // Vérifier si le nom de fichier contient déjà une extension
-          let fileName = this.newFileName;
-          if (!fileName.includes('.')) {
+          let fileName = this.newItemName;
+          if (!fileName.includes('.') && this.newFileType) {
             fileName = `${fileName}.${this.newFileType}`;
           }
           
           this.statusMessage = `Création du fichier ${fileName}...`;
           
-          try {
-            // Vérifier si un fichier avec le même nom existe déjà
-            const fileExists = this.files.some(f => f.name === fileName);
-            
-            if (fileExists) {
-              throw new Error(`Un fichier nommé ${fileName} existe déjà`);
+          // Vérifier si un fichier avec le même nom existe déjà
+          const fullPath = this.createInFolderPath 
+            ? `${this.createInFolderPath}/${fileName}`
+            : fileName;
+          
+          if (this.pathExists(fullPath)) {
+            throw new Error(`Un élément nommé ${fileName} existe déjà`);
+          }
+          
+          // Générer un ID unique
+          const fileId = this.generateId();
+          
+          // Créer le nouveau fichier
+          const newFile = {
+            id: fileId,
+            name: fileName,
+            content: '',
+            lastModified: new Date().toISOString()
+          };
+          
+          // Ajouter le fichier à l'emplacement approprié
+          if (this.createInFolderId) {
+            this.addFileToFolder(this.fileTree, this.createInFolderId, newFile);
+          } else {
+            this.fileTree.files.push(newFile);
+          }
+          
+          // Sauvegarder l'arborescence
+          this.saveFileTree();
+          
+          // Ouvrir le nouveau fichier
+          this.openFile(newFile);
+          
+          this.showToast(`Fichier ${fileName} créé avec succès`, 'success');
+          this.newItemName = '';
+          this.statusMessage = `Fichier ${fileName} créé et ouvert`;
+        },
+        
+        // Ajoute un fichier dans un dossier spécifique
+        addFileToFolder(node, folderId, file) {
+          // Vérifier si c'est le dossier cible
+          if (node.id === folderId) {
+            if (!node.files) node.files = [];
+            node.files.push(file);
+            return true;
+          }
+          
+          // Rechercher récursivement dans les sous-dossiers
+          if (node.folders) {
+            for (const folder of node.folders) {
+              if (this.addFileToFolder(folder, folderId, file)) {
+                return true;
+              }
             }
-            
-            // Générer un ID unique
-            const fileId = Date.now().toString();
-            
-            // Créer le nouveau fichier
-            const newFile = {
-              id: fileId,
-              name: fileName,
-              content: '',
-              lastModified: new Date().toISOString()
-            };
-            
-            // Ajouter le fichier à la liste
-            this.files.push(newFile);
-            
-            // Sauvegarder dans localStorage
-            this.saveToLocalStorage();
-            
-            // Ouvrir le nouveau fichier
-            this.currentFile = {
-              id: fileId,
-              name: fileName,
-              content: '',
-              unsaved: false
-            };
-            
-            this.initEditor('', this.getFileLanguage(fileName));
-            
-            this.showToast(`Fichier ${fileName} créé avec succès`, 'success');
-            this.showNewFileModal = false;
-            this.newFileName = '';
-            this.statusMessage = `Fichier ${fileName} créé et ouvert`;
-          } catch (error) {
-            this.showToast(`Erreur: ${error.message}`, 'error');
-            this.statusMessage = 'Prêt';
+          }
+          
+          // Vérifier au niveau racine si node est l'arborescence complète
+          if (node.folders) {
+            for (const folder of node.folders) {
+              if (folder.id === folderId) {
+                if (!folder.files) folder.files = [];
+                folder.files.push(file);
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        },
+        
+        // Crée un nouveau dossier
+        createNewFolder() {
+          const folderName = this.newItemName;
+          
+          this.statusMessage = `Création du dossier ${folderName}...`;
+          
+          // Vérifier si un dossier avec le même nom existe déjà
+          const fullPath = this.createInFolderPath 
+            ? `${this.createInFolderPath}/${folderName}`
+            : folderName;
+          
+          if (this.pathExists(fullPath)) {
+            throw new Error(`Un élément nommé ${folderName} existe déjà`);
+          }
+          
+          // Générer un ID unique
+          const folderId = this.generateId();
+          
+          // Créer le nouveau dossier
+          const newFolder = {
+            id: folderId,
+            name: folderName,
+            isExpanded: true,
+            folders: [],
+            files: []
+          };
+          
+          // Ajouter le dossier à l'emplacement approprié
+          if (this.createInFolderId) {
+            this.addFolderToFolder(this.fileTree, this.createInFolderId, newFolder);
+          } else {
+            this.fileTree.folders.push(newFolder);
+          }
+          
+          // Sauvegarder l'arborescence
+          this.saveFileTree();
+          
+          this.showToast(`Dossier ${folderName} créé avec succès`, 'success');
+          this.newItemName = '';
+          this.statusMessage = `Dossier ${folderName} créé`;
+        },
+        
+        // Ajoute un dossier dans un dossier spécifique
+        addFolderToFolder(node, parentId, folder) {
+          // Vérifier si c'est le dossier parent
+          if (node.id === parentId) {
+            if (!node.folders) node.folders = [];
+            node.folders.push(folder);
+            return true;
+          }
+          
+          // Rechercher récursivement dans les sous-dossiers
+          if (node.folders) {
+            for (const childFolder of node.folders) {
+              if (this.addFolderToFolder(childFolder, parentId, folder)) {
+                return true;
+              }
+            }
+          }
+          
+          // Vérifier au niveau racine si node est l'arborescence complète
+          if (node.folders) {
+            for (const childFolder of node.folders) {
+              if (childFolder.id === parentId) {
+                if (!childFolder.folders) childFolder.folders = [];
+                childFolder.folders.push(folder);
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        },
+        
+        // Initialise la boîte de dialogue de confirmation de suppression
+        confirmDeleteItem(item) {
+          const { type, item: targetItem } = item;
+          const isFolder = type === 'folder';
+          
+          const message = isFolder
+            ? `Êtes-vous sûr de vouloir supprimer le dossier "${targetItem.name}" et tout son contenu ?`
+            : `Êtes-vous sûr de vouloir supprimer le fichier "${targetItem.name}" ?`;
+          
+          if (confirm(message)) {
+            this.deleteItem(type, targetItem.id);
           }
         },
         
-        // Supprime un fichier
-        deleteFile(fileId) {
-          const file = this.files.find(f => f.id === fileId);
+        // Supprime un élément (fichier ou dossier)
+        deleteItem(type, itemId) {
+          if (type === 'file') {
+            this.deleteFileFromTree(this.fileTree, itemId);
+          } else {
+            this.deleteFolderFromTree(this.fileTree, itemId);
+          }
           
-          if (!file) {
-            this.showToast('Fichier non trouvé', 'error');
+          // Sauvegarder l'arborescence
+          this.saveFileTree();
+          
+          // Si le fichier supprimé est le fichier courant, fermer l'éditeur
+          if (this.currentFile && this.currentFile.id === itemId) {
+            this.currentFile = null;
+            if (editor) {
+              editor.dispose();
+              editor = null;
+            }
+          }
+          
+          this.showToast(`Élément supprimé`, 'success');
+          this.statusMessage = 'Prêt';
+        },
+        
+        // Supprime un fichier de l'arborescence
+        deleteFileFromTree(node, fileId) {
+          // Supprimer parmi les fichiers de ce nœud
+          if (node.files) {
+            const index = node.files.findIndex(f => f.id === fileId);
+            if (index !== -1) {
+              node.files.splice(index, 1);
+              return true;
+            }
+          }
+          
+          // Rechercher récursivement dans les dossiers
+          if (node.folders) {
+            for (const folder of node.folders) {
+              if (this.deleteFileFromTree(folder, fileId)) {
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        },
+        
+        // Supprime un dossier de l'arborescence
+        deleteFolderFromTree(node, folderId) {
+          // Supprimer parmi les dossiers de ce nœud
+          if (node.folders) {
+            const index = node.folders.findIndex(f => f.id === folderId);
+            if (index !== -1) {
+              node.folders.splice(index, 1);
+              return true;
+            }
+            
+            // Rechercher récursivement dans les sous-dossiers
+            for (const folder of node.folders) {
+              if (this.deleteFolderFromTree(folder, folderId)) {
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        },
+        
+        // Initialiser le renommage d'un élément
+        startRenameItem(data) {
+          this.renameItem = data;
+          this.newItemName = data.item.name;
+          this.showRenameModal = true;
+        },
+        
+        // Confirmer le renommage
+        renameItemConfirm() {
+          if (!this.newItemName || !this.renameItem) {
+            this.showToast('Veuillez saisir un nom valide', 'error');
             return;
           }
           
-          if (confirm(`Êtes-vous sûr de vouloir supprimer le fichier "${file.name}" ?`)) {
-            // Supprimer le fileHandle s'il existe
-            if (this.fileHandles.has(fileId)) {
-              this.fileHandles.delete(fileId);
+          try {
+            const { type, item } = this.renameItem;
+            const oldName = item.name;
+            const newName = this.newItemName;
+            
+            // Vérifier si le nouveau nom est différent
+            if (oldName === newName) {
+              this.showRenameModal = false;
+              return;
             }
             
-            // Supprimer le fichier de la liste
-            this.files = this.files.filter(f => f.id !== fileId);
+            // Trouver le chemin actuel sans le nom du fichier/dossier
+            const currentPath = this.getFilePath(item);
+            const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
             
-            // Sauvegarder dans localStorage
-            this.saveToLocalStorage();
+            // Vérifier si un élément avec le même nom existe déjà
+            const newPath = parentPath 
+              ? `${parentPath}/${newName}`
+              : newName;
             
-            // Si le fichier supprimé est le fichier courant, fermer l'éditeur
-            if (this.currentFile && this.currentFile.id === fileId) {
-              this.currentFile = null;
-              if (editor) {
-                editor.dispose();
-                editor = null;
+            if (this.pathExists(newPath)) {
+              throw new Error(`Un élément nommé ${newName} existe déjà`);
+            }
+            
+            if (type === 'file') {
+              this.renameFileInTree(this.fileTree, item.id, newName);
+              
+              // Si c'est le fichier actuellement ouvert, mettre à jour les références
+              if (this.currentFile && this.currentFile.id === item.id) {
+                this.currentFile.name = newName;
+                this.currentFile.path = this.getFilePath({id: item.id, name: newName});
+              }
+            } else {
+              this.renameFolderInTree(this.fileTree, item.id, newName);
+            }
+            
+            // Sauvegarder l'arborescence
+            this.saveFileTree();
+            
+            this.showToast(`"${oldName}" renommé en "${newName}"`, 'success');
+            this.showRenameModal = false;
+            this.renameItem = null;
+            
+          } catch (error) {
+            this.showToast(`Erreur: ${error.message}`, 'error');
+          }
+        },
+        
+        // Renomme un fichier dans l'arborescence
+        renameFileInTree(node, fileId, newName) {
+          // Chercher parmi les fichiers de ce nœud
+          if (node.files) {
+            for (let i = 0; i < node.files.length; i++) {
+              if (node.files[i].id === fileId) {
+                node.files[i].name = newName;
+                return true;
+              }
+            }
+          }
+          
+          // Rechercher récursivement dans les dossiers
+          if (node.folders) {
+            for (const folder of node.folders) {
+              if (this.renameFileInTree(folder, fileId, newName)) {
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        },
+        
+        // Renomme un dossier dans l'arborescence
+        renameFolderInTree(node, folderId, newName) {
+          // Chercher parmi les dossiers de ce nœud
+          if (node.folders) {
+            for (let i = 0; i < node.folders.length; i++) {
+              if (node.folders[i].id === folderId) {
+                node.folders[i].name = newName;
+                return true;
               }
             }
             
-            this.showToast(`Fichier ${file.name} supprimé`, 'success');
-            this.statusMessage = 'Prêt';
+            // Rechercher récursivement dans les sous-dossiers
+            for (const folder of node.folders) {
+              if (this.renameFolderInTree(folder, folderId, newName)) {
+                return true;
+              }
+            }
           }
+          
+          return false;
         },
         
         // Affiche un toast de notification
@@ -680,7 +1329,9 @@
           }, 3000);
         }
       }
-    }).mount('#app');
+    });
+    
+    app.mount('#app');
   </script>
 </body>
 </html>
