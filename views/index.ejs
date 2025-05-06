@@ -34,6 +34,9 @@
         <button @click="saveFile" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center" :disabled="!currentFile">
           <i class='bx bx-save mr-1'></i> Sauvegarder
         </button>
+        <button @click="saveFileAs" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center" :disabled="!currentFile">
+          <i class='bx bx-export mr-1'></i> {{ hasFileSystemAccessAPI ? 'Enregistrer sur le disque' : 'Télécharger' }}
+        </button>
       </div>
     </header>
     
@@ -204,16 +207,28 @@
           toasts: [],
           showNewFileModal: false,
           newFileName: '',
-          newFileType: 'js'
+          newFileType: 'js',
+          // Map to store FileSystemFileHandle objects
+          fileHandles: new Map(),
+          hasFileSystemAccessAPI: false
         }
       },
       mounted() {
         this.loadFiles();
+        
+        // Vérifie les capacités du navigateur
+        this.checkBrowserCapabilities();
       },
       methods: {
         // Sauvegarde les données dans localStorage
         saveToLocalStorage() {
-          localStorage.setItem('versusCodeFiles', JSON.stringify(this.files));
+          // Nous ne pouvons pas stocker les fileHandle directement dans localStorage
+          const serializedFiles = this.files.map(file => ({
+            ...file,
+            hasFileHandle: this.fileHandles.has(file.id)
+          }));
+          
+          localStorage.setItem('versusCodeFiles', JSON.stringify(serializedFiles));
         },
         
         // Charge les fichiers depuis localStorage
@@ -224,6 +239,8 @@
             const storedFiles = localStorage.getItem('versusCodeFiles');
             if (storedFiles) {
               this.files = JSON.parse(storedFiles);
+              // Les fileHandles ne peuvent pas être persistés entre les sessions
+              this.fileHandles = new Map();
             } else {
               this.files = [];
             }
@@ -365,7 +382,7 @@
           }
         },
         
-        // Sauvegarde le fichier courant
+        // Sauvegarde le fichier courant dans localStorage
         saveFile() {
           if (!this.currentFile || !editor) return;
           
@@ -388,14 +405,174 @@
               this.currentFile.content = content;
               this.currentFile.unsaved = false;
               
-              this.showToast('Fichier sauvegardé avec succès', 'success');
+              this.showToast('Fichier sauvegardé dans l\'application', 'success');
               this.statusMessage = `Fichier ${this.currentFile.name} sauvegardé`;
+              
+              // Si ce fichier a un fileHandle associé et l'API est disponible,
+              // le sauvegarder aussi sur le disque
+              if (this.hasFileSystemAccessAPI && this.fileHandles.has(this.currentFile.id)) {
+                this.saveFileToHandle(this.currentFile.id, content);
+              }
             } else {
               throw new Error('Fichier non trouvé dans la liste');
             }
           } catch (error) {
             this.showToast(`Erreur: ${error.message}`, 'error');
             this.statusMessage = 'Prêt';
+          }
+        },
+        
+        // Sauvegarde le fichier sur le disque
+        async saveFileAs() {
+          if (!this.currentFile || !editor) return;
+          
+          this.statusMessage = 'Préparation de l\'enregistrement...';
+          const content = editor.getValue();
+          
+          // Utilise l'API File System Access si disponible (Chrome, Edge, Opera)
+          if (this.hasFileSystemAccessAPI) {
+            try {
+              // Options pour la boîte de dialogue
+              const options = {
+                suggestedName: this.currentFile.name,
+                types: [{
+                  description: 'Fichiers texte',
+                  accept: this.getFileAcceptType(this.currentFile.name)
+                }]
+              };
+              
+              // Ouvre la boîte de dialogue "Enregistrer sous"
+              const fileHandle = await window.showSaveFilePicker(options);
+              
+              // Stocke le fileHandle pour une utilisation future
+              this.fileHandles.set(this.currentFile.id, fileHandle);
+              
+              // Sauvegarde le contenu dans le fichier
+              await this.writeToFile(fileHandle, content);
+              
+              this.showToast('Fichier enregistré sur le disque', 'success');
+              this.statusMessage = `Fichier enregistré sur le disque: ${fileHandle.name}`;
+              
+              // Mettre à jour le nom du fichier dans l'application si nécessaire
+              if (this.currentFile.name !== fileHandle.name) {
+                // Mettre à jour dans la liste des fichiers
+                const fileIndex = this.files.findIndex(f => f.id === this.currentFile.id);
+                if (fileIndex !== -1) {
+                  this.files[fileIndex].name = fileHandle.name;
+                  this.currentFile.name = fileHandle.name;
+                  this.saveToLocalStorage();
+                }
+              }
+              
+              // Marquer comme sauvegardé
+              this.currentFile.unsaved = false;
+            } catch (error) {
+              // L'utilisateur a peut-être annulé la boîte de dialogue
+              if (error.name !== 'AbortError') {
+                this.showToast(`Erreur lors de l'enregistrement: ${error.message}`, 'error');
+              }
+              this.statusMessage = 'Prêt';
+            }
+          } 
+          // Méthode alternative pour Firefox et Safari
+          else {
+            try {
+              // Créer un objet Blob avec le contenu
+              const blob = new Blob([content], { type: this.getMimeType(this.currentFile.name) });
+              
+              // Créer un URL pour le blob
+              const url = URL.createObjectURL(blob);
+              
+              // Créer un élément <a> pour déclencher le téléchargement
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = this.currentFile.name;
+              
+              // Ajouter l'élément à la page et cliquer dessus
+              document.body.appendChild(a);
+              a.click();
+              
+              // Nettoyer
+              setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }, 0);
+              
+              this.showToast('Fichier téléchargé', 'success');
+              this.statusMessage = `Fichier téléchargé: ${this.currentFile.name}`;
+              
+              // Marquer comme sauvegardé
+              this.currentFile.unsaved = false;
+            } catch (error) {
+              this.showToast(`Erreur lors du téléchargement: ${error.message}`, 'error');
+              this.statusMessage = 'Prêt';
+            }
+          }
+        },
+        
+        // Sauvegarde le contenu dans un fileHandle existant
+        async saveFileToHandle(fileId, content) {
+          const fileHandle = this.fileHandles.get(fileId);
+          if (!fileHandle) return;
+          
+          try {
+            await this.writeToFile(fileHandle, content);
+            this.showToast(`Fichier enregistré sur le disque: ${fileHandle.name}`, 'success');
+          } catch (error) {
+            this.showToast(`Erreur lors de l'enregistrement sur le disque: ${error.message}`, 'error');
+          }
+        },
+        
+        // Écrit le contenu dans un fichier
+        async writeToFile(fileHandle, content) {
+          // Crée un objet FileSystemWritableFileStream pour écrire dans
+          const writable = await fileHandle.createWritable();
+          
+          // Écrit le contenu dans le fichier
+          await writable.write(content);
+          
+          // Ferme le flux d'écriture
+          await writable.close();
+        },
+        
+        // Retourne le type MIME approprié pour le type de fichier (pour API File System Access)
+        getFileAcceptType(fileName) {
+          const extension = fileName.split('.').pop();
+          const mimeTypes = {
+            'js': { 'application/javascript': ['.js'] },
+            'html': { 'text/html': ['.html'] },
+            'css': { 'text/css': ['.css'] },
+            'py': { 'text/x-python': ['.py'] },
+            'go': { 'text/x-go': ['.go'] },
+            'txt': { 'text/plain': ['.txt'] }
+          };
+          
+          return mimeTypes[extension] || { 'text/plain': ['.txt'] };
+        },
+        
+        // Retourne le type MIME pour un fichier (pour la méthode de téléchargement)
+        getMimeType(fileName) {
+          const extension = fileName.split('.').pop();
+          const mimeTypes = {
+            'js': 'application/javascript',
+            'html': 'text/html',
+            'css': 'text/css',
+            'py': 'text/x-python',
+            'go': 'text/x-go',
+            'txt': 'text/plain'
+          };
+          
+          return mimeTypes[extension] || 'text/plain';
+        },
+        
+        // Vérifie les capacités du navigateur pour l'enregistrement de fichiers
+        checkBrowserCapabilities() {
+          this.hasFileSystemAccessAPI = 'showSaveFilePicker' in window;
+          
+          // Si l'API File System Access n'est pas disponible, on modifie le texte du bouton
+          if (!this.hasFileSystemAccessAPI) {
+            // Pas de message d'erreur, nous avons une alternative
+            // On peut personnaliser l'interface selon les capacités du navigateur
           }
         },
         
@@ -469,6 +646,11 @@
           }
           
           if (confirm(`Êtes-vous sûr de vouloir supprimer le fichier "${file.name}" ?`)) {
+            // Supprimer le fileHandle s'il existe
+            if (this.fileHandles.has(fileId)) {
+              this.fileHandles.delete(fileId);
+            }
+            
             // Supprimer le fichier de la liste
             this.files = this.files.filter(f => f.id !== fileId);
             
