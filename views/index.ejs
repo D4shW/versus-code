@@ -47,7 +47,7 @@
             <button @click="showNewFileModal = true" class="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white flex items-center" title="Nouveau fichier">
               <i class='bx bx-plus'></i> Nouveau
             </button>
-            <button @click="fetchFiles" class="hover:text-blue-300" title="Rafraîchir">
+            <button @click="loadFiles" class="hover:text-blue-300" title="Rafraîchir">
               <i class='bx bx-refresh'></i>
             </button>
           </div>
@@ -64,13 +64,22 @@
           <div v-else>
             <div 
               v-for="file in files" 
-              :key="file.name" 
-              @click="openFile(file.name)" 
-              class="cursor-pointer p-2 hover:bg-gray-700 rounded flex items-center"
-              :class="{'bg-gray-700': currentFile && currentFile.id === file.name}"
+              :key="file.id" 
+              @click="openFile(file.id)" 
+              class="cursor-pointer p-2 hover:bg-gray-700 rounded flex items-center justify-between group"
+              :class="{'bg-gray-700': currentFile && currentFile.id === file.id}"
             >
-              <i class='bx bx-code-alt mr-2 text-blue-400'></i>
-              <span class="truncate">{{ file.name }}</span>
+              <div class="flex items-center truncate">
+                <i class='bx bx-code-alt mr-2 text-blue-400'></i>
+                <span class="truncate">{{ file.name }}</span>
+              </div>
+              <button 
+                @click.stop="deleteFile(file.id)" 
+                class="text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Supprimer"
+              >
+                <i class='bx bx-trash'></i>
+              </button>
             </div>
           </div>
         </div>
@@ -86,9 +95,14 @@
           </p>
         </div>
         <div v-else class="flex-1 flex flex-col">
-          <div class="bg-gray-800 px-3 py-2 text-sm border-b border-gray-700 flex items-center">
-            <i class='bx bx-code-alt text-blue-400 mr-2'></i>
-            <span>{{ currentFile.id }}</span>
+          <div class="bg-gray-800 px-3 py-2 text-sm border-b border-gray-700 flex items-center justify-between">
+            <div class="flex items-center">
+              <i class='bx bx-code-alt text-blue-400 mr-2'></i>
+              <span>{{ currentFile.name }}</span>
+            </div>
+            <div v-if="currentFile.unsaved" class="text-orange-400 text-xs">
+              <i class='bx bx-circle'></i> Non sauvegardé
+            </div>
           </div>
           <div id="editor" class="flex-1"></div>
         </div>
@@ -126,7 +140,7 @@
             <label for="fileName" class="block mb-2 text-sm font-medium text-gray-300">Nom du fichier</label>
             <input type="text" id="fileName" v-model="newFileName" 
                   class="bg-gray-700 border border-gray-600 text-white text-sm rounded block w-full p-2.5 focus:ring-blue-500 focus:border-blue-500" 
-                  placeholder="exemple.js" required>
+                  placeholder="exemple" required>
           </div>
           
           <div class="mb-4">
@@ -160,6 +174,7 @@
   <script>
     // Attendre que Monaco Editor soit chargé
     let editor = null;
+    let hasEditorChanges = false;
 
     // Configuration de Monaco Editor
     function initMonaco() {
@@ -193,16 +208,25 @@
         }
       },
       mounted() {
-        this.fetchFiles();
+        this.loadFiles();
       },
       methods: {
-        // Récupère la liste des fichiers
-        async fetchFiles() {
+        // Sauvegarde les données dans localStorage
+        saveToLocalStorage() {
+          localStorage.setItem('versusCodeFiles', JSON.stringify(this.files));
+        },
+        
+        // Charge les fichiers depuis localStorage
+        loadFiles() {
           this.loading = true;
+          
           try {
-            const response = await fetch('/api/files');
-            const data = await response.json();
-            this.files = data.files || [];
+            const storedFiles = localStorage.getItem('versusCodeFiles');
+            if (storedFiles) {
+              this.files = JSON.parse(storedFiles);
+            } else {
+              this.files = [];
+            }
             this.statusMessage = `${this.files.length} fichier(s) trouvé(s)`;
           } catch (error) {
             this.showToast('Erreur lors du chargement des fichiers', 'error');
@@ -212,44 +236,37 @@
         },
         
         // Ouvre un fichier dans l'éditeur
-        async openFile(fileId) {
-          this.statusMessage = `Ouverture de ${fileId}...`;
+        openFile(fileId) {
+          const file = this.files.find(f => f.id === fileId);
+          if (!file) {
+            this.showToast(`Fichier non trouvé: ${fileId}`, 'error');
+            return;
+          }
+          
+          this.statusMessage = `Ouverture de ${file.name}...`;
+          
           try {
-            const response = await fetch(`/api/files/${fileId}`);
-            const data = await response.json();
-            
             this.currentFile = {
-              id: fileId,
-              content: data.content
+              id: file.id,
+              name: file.name,
+              content: file.content,
+              unsaved: false
             };
             
-            this.initEditor(data.content);
-            this.statusMessage = `Fichier ${fileId} ouvert`;
+            this.initEditor(file.content, this.getFileLanguage(file.name));
+            this.statusMessage = `Fichier ${file.name} ouvert`;
           } catch (error) {
-            this.showToast(`Erreur lors de l'ouverture du fichier: ${fileId}`, 'error');
+            this.showToast(`Erreur lors de l'ouverture du fichier: ${file.name}`, 'error');
             this.statusMessage = 'Prêt';
           }
         },
         
         // Initialise l'éditeur Monaco
-        initEditor(content) {
+        initEditor(content, language) {
           require(['vs/editor/editor.main'], () => {
             if (editor) {
               editor.dispose();
             }
-            
-            const langMap = {
-              'js': 'javascript',
-              'py': 'python',
-              'html': 'html',
-              'css': 'css',
-              'go': 'go',
-              'txt': 'plaintext'
-            };
-            
-            // Déterminer le langage en fonction de l'extension du fichier
-            const fileExt = this.currentFile.id.split('.').pop();
-            const language = langMap[fileExt] || 'plaintext';
             
             editor = monaco.editor.create(document.getElementById('editor'), {
               value: content,
@@ -268,7 +285,29 @@
               cursorStyle: 'line',
               autoIndent: 'full'
             });
+            
+            // Détecter les changements dans l'éditeur
+            editor.onDidChangeModelContent(() => {
+              if (this.currentFile) {
+                this.currentFile.unsaved = true;
+              }
+            });
           });
+        },
+        
+        // Récupère le langage en fonction de l'extension du fichier
+        getFileLanguage(fileName) {
+          const langMap = {
+            'js': 'javascript',
+            'py': 'python',
+            'html': 'html',
+            'css': 'css',
+            'go': 'go',
+            'txt': 'plaintext'
+          };
+          
+          const fileExt = fileName.split('.').pop();
+          return langMap[fileExt] || 'plaintext';
         },
         
         // Télécharge et ouvre un fichier
@@ -276,70 +315,176 @@
           const file = event.target.files[0];
           if (!file) return;
           
-          const formData = new FormData();
-          formData.append('file', file);
-          
-          this.statusMessage = `Téléchargement de ${file.name}...`;
+          this.statusMessage = `Chargement de ${file.name}...`;
           
           try {
-            const response = await fetch('/api/upload', {
-              method: 'POST',
-              body: formData
-            });
+            const reader = new FileReader();
             
-            const data = await response.json();
-            
-            if (data.success) {
-              this.showToast('Fichier téléchargé avec succès', 'success');
+            reader.onload = (e) => {
+              const content = e.target.result;
+              
+              // Générer un ID unique
+              const fileId = Date.now().toString();
+              
+              // Ajouter le fichier à la liste
+              this.files.push({
+                id: fileId,
+                name: file.name,
+                content: content,
+                lastModified: new Date().toISOString()
+              });
+              
+              // Sauvegarder dans localStorage
+              this.saveToLocalStorage();
+              
+              // Ouvrir le fichier importé
               this.currentFile = {
-                id: data.fileId,
-                content: data.content
+                id: fileId,
+                name: file.name,
+                content: content,
+                unsaved: false
               };
               
-              this.initEditor(data.content);
-              this.fetchFiles();
-              this.statusMessage = `Fichier ${file.name} téléchargé et ouvert`;
+              this.initEditor(content, this.getFileLanguage(file.name));
+              
+              this.showToast('Fichier importé avec succès', 'success');
+              this.statusMessage = `Fichier ${file.name} importé et ouvert`;
+            };
+            
+            reader.onerror = () => {
+              throw new Error("Erreur lors de la lecture du fichier");
+            };
+            
+            reader.readAsText(file);
+          } catch (error) {
+            this.showToast(`Erreur: ${error.message}`, 'error');
+            this.statusMessage = 'Prêt';
+          } finally {
+            // Réinitialiser l'input file
+            event.target.value = '';
+          }
+        },
+        
+        // Sauvegarde le fichier courant
+        saveFile() {
+          if (!this.currentFile || !editor) return;
+          
+          this.statusMessage = 'Sauvegarde en cours...';
+          
+          try {
+            const content = editor.getValue();
+            
+            // Mettre à jour le fichier dans la liste
+            const fileIndex = this.files.findIndex(f => f.id === this.currentFile.id);
+            
+            if (fileIndex !== -1) {
+              this.files[fileIndex].content = content;
+              this.files[fileIndex].lastModified = new Date().toISOString();
+              
+              // Sauvegarder dans localStorage
+              this.saveToLocalStorage();
+              
+              // Mettre à jour le fichier courant
+              this.currentFile.content = content;
+              this.currentFile.unsaved = false;
+              
+              this.showToast('Fichier sauvegardé avec succès', 'success');
+              this.statusMessage = `Fichier ${this.currentFile.name} sauvegardé`;
             } else {
-              throw new Error(data.error || 'Erreur lors du téléchargement');
+              throw new Error('Fichier non trouvé dans la liste');
             }
           } catch (error) {
             this.showToast(`Erreur: ${error.message}`, 'error');
             this.statusMessage = 'Prêt';
           }
-          
-          // Réinitialiser l'input file
-          event.target.value = '';
         },
         
-        // Sauvegarde le fichier courant
-        async saveFile() {
-          if (!this.currentFile || !editor) return;
+        // Crée un nouveau fichier
+        createNewFile() {
+          if (!this.newFileName) {
+            this.showToast('Veuillez saisir un nom de fichier', 'error');
+            return;
+          }
           
-          const content = editor.getValue();
-          this.statusMessage = 'Sauvegarde en cours...';
+          // Vérifier si le nom de fichier contient déjà une extension
+          let fileName = this.newFileName;
+          if (!fileName.includes('.')) {
+            fileName = `${fileName}.${this.newFileType}`;
+          }
+          
+          this.statusMessage = `Création du fichier ${fileName}...`;
           
           try {
-            const response = await fetch('/api/save', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                fileId: this.currentFile.id,
-                content: content
-              })
-            });
+            // Vérifier si un fichier avec le même nom existe déjà
+            const fileExists = this.files.some(f => f.name === fileName);
             
-            const data = await response.json();
-            
-            if (data.success) {
-              this.showToast('Fichier sauvegardé avec succès', 'success');
-              this.statusMessage = `Fichier ${this.currentFile.id} sauvegardé`;
-            } else {
-              throw new Error(data.error || 'Erreur lors de la sauvegarde');
+            if (fileExists) {
+              throw new Error(`Un fichier nommé ${fileName} existe déjà`);
             }
+            
+            // Générer un ID unique
+            const fileId = Date.now().toString();
+            
+            // Créer le nouveau fichier
+            const newFile = {
+              id: fileId,
+              name: fileName,
+              content: '',
+              lastModified: new Date().toISOString()
+            };
+            
+            // Ajouter le fichier à la liste
+            this.files.push(newFile);
+            
+            // Sauvegarder dans localStorage
+            this.saveToLocalStorage();
+            
+            // Ouvrir le nouveau fichier
+            this.currentFile = {
+              id: fileId,
+              name: fileName,
+              content: '',
+              unsaved: false
+            };
+            
+            this.initEditor('', this.getFileLanguage(fileName));
+            
+            this.showToast(`Fichier ${fileName} créé avec succès`, 'success');
+            this.showNewFileModal = false;
+            this.newFileName = '';
+            this.statusMessage = `Fichier ${fileName} créé et ouvert`;
           } catch (error) {
             this.showToast(`Erreur: ${error.message}`, 'error');
+            this.statusMessage = 'Prêt';
+          }
+        },
+        
+        // Supprime un fichier
+        deleteFile(fileId) {
+          const file = this.files.find(f => f.id === fileId);
+          
+          if (!file) {
+            this.showToast('Fichier non trouvé', 'error');
+            return;
+          }
+          
+          if (confirm(`Êtes-vous sûr de vouloir supprimer le fichier "${file.name}" ?`)) {
+            // Supprimer le fichier de la liste
+            this.files = this.files.filter(f => f.id !== fileId);
+            
+            // Sauvegarder dans localStorage
+            this.saveToLocalStorage();
+            
+            // Si le fichier supprimé est le fichier courant, fermer l'éditeur
+            if (this.currentFile && this.currentFile.id === fileId) {
+              this.currentFile = null;
+              if (editor) {
+                editor.dispose();
+                editor = null;
+              }
+            }
+            
+            this.showToast(`Fichier ${file.name} supprimé`, 'success');
             this.statusMessage = 'Prêt';
           }
         },
@@ -356,51 +501,6 @@
               this.toasts.splice(index, 1);
             }
           }, 3000);
-        },
-        
-        // Crée un nouveau fichier
-        async createNewFile() {
-          if (!this.newFileName) {
-            this.showToast('Veuillez saisir un nom de fichier', 'error');
-            return;
-          }
-          
-          // Vérifier si le nom de fichier contient déjà une extension
-          let fileName = this.newFileName;
-          if (!fileName.includes('.')) {
-            fileName = `${fileName}.${this.newFileType}`;
-          }
-          
-          this.statusMessage = `Création du fichier ${fileName}...`;
-          
-          try {
-            const response = await fetch('/api/create', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                fileName: fileName,
-                content: ''
-              })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-              this.showToast(`Fichier ${fileName} créé avec succès`, 'success');
-              this.fetchFiles();
-              this.openFile(data.fileId);
-              this.showNewFileModal = false;
-              this.newFileName = '';
-              this.statusMessage = `Fichier ${fileName} créé et ouvert`;
-            } else {
-              throw new Error(data.error || 'Erreur lors de la création du fichier');
-            }
-          } catch (error) {
-            this.showToast(`Erreur: ${error.message}`, 'error');
-            this.statusMessage = 'Prêt';
-          }
         }
       }
     }).mount('#app');
