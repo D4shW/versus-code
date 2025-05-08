@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VersusCode - Éditeur de Code</title>
+  <!-- Ajout de la favicon -->
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
   <!-- Chargement de Vue.js depuis CDN -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <!-- Ajout de Monaco Editor (comme VSCode) -->
@@ -16,24 +19,31 @@
 </head>
 <body class="bg-gray-900 text-white h-screen overflow-hidden">
   <div id="app" class="h-full flex flex-col">
-    <!-- En-tête de l'application -->
-    <header class="bg-gray-800 p-3 flex items-center justify-between border-b border-gray-700">
-      <div class="flex items-center">
-        <h1 class="text-xl font-bold text-blue-400">VersusCode</h1>
-      </div>
-      <div class="flex items-center space-x-4">
-        <label for="file-upload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm flex items-center">
-          <i class='bx bx-upload mr-1'></i> Importer
-          <input id="file-upload" type="file" class="hidden" @change="uploadFile" accept=".txt,.js,.html,.css,.go,.py">
-        </label>
-        <button @click="saveFile" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center" :disabled="!currentFile">
-          <i class='bx bx-save mr-1'></i> Sauvegarder
-        </button>
-        <button @click="saveFileAs" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center" :disabled="!currentFile">
-          <i class='bx bx-export mr-1'></i> {{ hasFileSystemAccessAPI ? 'Enregistrer sur le disque' : 'Télécharger' }}
-        </button>
-      </div>
-    </header>
+
+<!-- En-tête de l'application avec trois sections distinctes -->
+<header class="bg-gray-800 p-3 flex items-center border-b border-gray-700">
+  <!-- Section gauche: Logo uniquement -->
+  <div class="flex items-center">
+    <img src="/logo-vscode.png" alt="VS Code Logo" class="h-8" title="VersusCode">
+  </div>
+  
+  <!-- Section milieu: espace flexible -->
+  <div class="flex-1"></div>
+  
+  <!-- Section droite: boutons d'action -->
+  <div class="flex items-center space-x-4">
+    <label for="file-upload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm flex items-center">
+      <i class='bx bx-upload mr-1'></i> Importer
+      <input id="file-upload" type="file" class="hidden" @change="uploadFile" accept=".txt,.js,.html,.css,.go,.py">
+    </label>
+    <button @click="saveFile" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center" :disabled="!currentFile">
+      <i class='bx bx-save mr-1'></i> Sauvegarder
+    </button>
+    <button @click="saveFileAs" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center" :disabled="!currentFile">
+      <i class='bx bx-export mr-1'></i> {{ hasFileSystemAccessAPI ? 'Enregistrer sur le disque' : 'Télécharger' }}
+    </button>
+  </div>
+</header>
     
     <!-- Corps principal -->
     <main class="flex flex-1 overflow-hidden">
