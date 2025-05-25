@@ -4,33 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VersusCode - Éditeur de Code</title>
-  <!-- Ajout de la favicon -->
+  
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
   <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-  <!-- Chargement de Vue.js depuis CDN -->
+  
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <!-- Ajout de Monaco Editor (comme VSCode) -->
+  
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs/loader.js"></script>
-  <!-- Tailwind CSS pour le style -->
+  
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Boxicons pour les icônes -->
+  
   <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="bg-gray-900 text-white h-screen overflow-hidden">
   <div id="app" class="h-full flex flex-col">
 
-<!-- En-tête de l'application avec trois sections distinctes -->
+
 <header class="bg-gray-800 p-3 flex items-center border-b border-gray-700">
-  <!-- Section gauche: Logo uniquement -->
+  
   <div class="flex items-center">
     <img src="/logo-vscode.png" alt="VS Code Logo" class="h-8" title="VersusCode">
   </div>
   
-  <!-- Section milieu: espace flexible -->
+  
   <div class="flex-1"></div>
   
-  <!-- Section droite: boutons d'action -->
+  
   <div class="flex items-center space-x-4">
     <label for="file-upload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm flex items-center">
       <i class='bx bx-upload mr-1'></i> Importer
@@ -45,9 +45,9 @@
   </div>
 </header>
     
-    <!-- Corps principal -->
+    
     <main class="flex flex-1 overflow-hidden">
-      <!-- Barre latérale pour l'explorateur de fichiers -->
+      
       <aside class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
         <div class="p-2 text-gray-400 font-semibold flex items-center justify-between">
           <span>EXPLORATEUR</span>
@@ -73,7 +73,7 @@
             <p>Aucun fichier</p>
           </div>
           <div v-else>
-            <!-- Rendu récursif des dossiers et fichiers -->
+            
             <file-tree-item 
               v-for="folder in fileTree.folders" 
               :key="'folder-' + folder.id" 
@@ -101,7 +101,7 @@
         </div>
       </aside>
       
-      <!-- Éditeur de code principal -->
+      
       <section class="flex-1 flex flex-col bg-gray-900">
         <div v-if="!currentFile" class="flex-1 flex items-center justify-center text-gray-400 flex-col">
           <i class='bx bx-code-curly text-6xl mb-4'></i>
@@ -125,14 +125,14 @@
       </section>
     </main>
     
-    <!-- Barre d'état en bas -->
+    
     <footer class="bg-blue-600 text-white p-1 text-xs flex items-center">
       <div class="ml-2">{{ statusMessage }}</div>
       <div class="flex-1"></div>
       <div class="mr-2" v-if="currentFile">UTF-8</div>
     </footer>
     
-    <!-- Toast notifications -->
+    
     <div class="fixed bottom-5 right-5 z-50">
       <div v-for="(toast, index) in toasts" :key="index" 
            class="mb-2 p-3 rounded shadow-lg max-w-sm transition-all"
@@ -141,7 +141,7 @@
       </div>
     </div>
     
-    <!-- Modal pour créer un nouveau fichier ou dossier -->
+    
     <div v-if="showCreateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 border border-gray-700">
         <div class="flex justify-between items-center mb-4">
@@ -197,7 +197,7 @@
       </div>
     </div>
     
-    <!-- Modal pour renommer un élément -->
+    
     <div v-if="showRenameModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 border border-gray-700">
         <div class="flex justify-between items-center mb-4">
@@ -236,13 +236,13 @@
     </div>
   </div>
 
-  <!-- Composant récursif pour l'arborescence des fichiers -->
+  
   <template id="file-tree-item-template">
     <div 
       class="file-tree-item"
       :style="{ paddingLeft: `${depth * 16}px` }"
     >
-      <!-- Dossier -->
+      
       <template v-if="type === 'folder'">
         <div 
           class="flex items-center justify-between p-1 hover:bg-gray-700 rounded cursor-pointer group relative"
@@ -273,9 +273,9 @@
           </div>
         </div>
         
-        <!-- Contenu du dossier (rendu récursif si déplié) -->
+        
         <div v-if="item.isExpanded" class="ml-1 pl-1 border-l border-gray-600">
-          <!-- Dossiers enfants -->
+          
           <file-tree-item 
             v-for="childFolder in item.folders" 
             :key="'folder-' + childFolder.id" 
@@ -289,7 +289,7 @@
             @rename-item="$emit('rename-item', $event)"
           ></file-tree-item>
           
-          <!-- Fichiers dans ce dossier -->
+          
           <file-tree-item 
             v-for="childFile in item.files" 
             :key="'file-' + childFile.id" 
@@ -303,7 +303,7 @@
         </div>
       </template>
       
-      <!-- Fichier -->
+      
       <template v-else>
         <div 
           @click="$emit('open-file', item)"
@@ -328,11 +328,11 @@
   </template>
 
   <script>
-    // Attendre que Monaco Editor soit chargé
+    
     let editor = null;
     let hasEditorChanges = false;
 
-    // Configuration de Monaco Editor
+    
     function initMonaco() {
       require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs' }});
       window.MonacoEnvironment = { getWorkerUrl: () => proxy };
@@ -347,7 +347,7 @@
 
     initMonaco();
 
-    // Créer le composant récursif pour l'arborescence des fichiers
+    
     const FileTreeItem = {
       name: 'FileTreeItem',
       template: '#file-tree-item-template',
@@ -361,7 +361,7 @@
       },
       computed: {
         isActive() {
-          // Comparaison avec le fichier actuel
+          
           return this.$root.currentFile && this.$root.currentFile.id === this.item.id;
         }
       },
@@ -387,7 +387,7 @@
       }
     };
 
-    // Création de l'application Vue
+    
     const { createApp } = Vue;
     
     const app = createApp({
@@ -396,7 +396,7 @@
       },
       data() {
         return {
-          // Structure arborescente des fichiers
+          
           fileTree: {
             folders: [],
             files: []
@@ -406,9 +406,9 @@
           statusMessage: 'Prêt',
           toasts: [],
           
-          // Modals
+          
           showCreateModal: false,
-          createModalType: 'file', // 'file' ou 'folder'
+          createModalType: 'file', 
           newItemName: '',
           newFileType: 'js',
           createInFolderPath: null,
@@ -417,7 +417,7 @@
           showRenameModal: false,
           renameItem: null,
           
-          // Pour le système de fichiers local
+          
           fileHandles: new Map(),
           hasFileSystemAccessAPI: false
         }
@@ -425,19 +425,19 @@
       mounted() {
         this.loadFileTree();
         
-        // Vérifie les capacités du navigateur
+        
         this.checkBrowserCapabilities();
       },
       methods: {
-        // Génère un identifiant unique
+        
         generateId() {
           return Date.now().toString() + Math.floor(Math.random() * 1000);
         },
         
-        // Sauvegarde l'arborescence dans localStorage
+        
         saveFileTree() {
           try {
-            // Les fileHandles ne peuvent pas être sérialisés
+            
             const serializedTree = JSON.stringify(this.fileTree);
             localStorage.setItem('versusCodeFileTree', serializedTree);
           } catch (error) {
@@ -446,7 +446,7 @@
           }
         },
         
-        // Charge l'arborescence depuis localStorage
+        
         loadFileTree() {
           this.loading = true;
           
@@ -456,14 +456,14 @@
             if (storedTree) {
               this.fileTree = JSON.parse(storedTree);
             } else {
-              // Initialiser une arborescence vide
+              
               this.fileTree = {
                 folders: [],
                 files: []
               };
             }
             
-            // Compter les fichiers et dossiers
+            
             const fileCount = this.countFiles(this.fileTree);
             const folderCount = this.countFolders(this.fileTree);
             
@@ -472,7 +472,7 @@
             console.error('Erreur lors du chargement de l\'arborescence:', error);
             this.showToast('Erreur lors du chargement de l\'arborescence', 'error');
             
-            // Réinitialiser en cas d'erreur
+            
             this.fileTree = {
               folders: [],
               files: []
@@ -482,7 +482,7 @@
           }
         },
         
-        // Compte le nombre total de fichiers dans l'arborescence
+        
         countFiles(node) {
           let count = node.files ? node.files.length : 0;
           
@@ -495,7 +495,7 @@
           return count;
         },
         
-        // Compte le nombre total de dossiers dans l'arborescence
+        
         countFolders(node) {
           let count = node.folders ? node.folders.length : 0;
           
@@ -508,12 +508,12 @@
           return count;
         },
         
-        // Ouvre un fichier dans l'éditeur
+        
         openFile(file) {
           this.statusMessage = `Ouverture de ${file.name}...`;
           
           try {
-            // Construire le chemin complet
+            
             const path = this.getFilePath(file);
             
             this.currentFile = {
@@ -533,18 +533,18 @@
           }
         },
         
-        // Récupère le chemin d'accès complet d'un fichier
+        
         getFilePath(file, currentPath = '') {
-          // Si nous connaissons déjà le chemin complet
+          
           if (file.fullPath) return file.fullPath;
           
-          // Recherche dans la structure arborescente
+          
           return this.findFilePath(this.fileTree, file.id) || file.name;
         },
         
-        // Recherche récursive du chemin d'un fichier
+        
         findFilePath(node, fileId, currentPath = '') {
-          // Vérifier parmi les fichiers de ce nœud
+          
           if (node.files) {
             for (const file of node.files) {
               if (file.id === fileId) {
@@ -553,7 +553,7 @@
             }
           }
           
-          // Vérifier récursivement dans les dossiers
+          
           if (node.folders) {
             for (const folder of node.folders) {
               const path = currentPath ? `${currentPath}/${folder.name}` : folder.name;
@@ -565,7 +565,7 @@
           return null;
         },
         
-        // Initialise l'éditeur Monaco
+        
         initEditor(content, language) {
           require(['vs/editor/editor.main'], () => {
             if (editor) {
@@ -590,7 +590,7 @@
               autoIndent: 'full'
             });
             
-            // Détecter les changements dans l'éditeur
+            
             editor.onDidChangeModelContent(() => {
               if (this.currentFile) {
                 this.currentFile.unsaved = true;
@@ -599,7 +599,7 @@
           });
         },
         
-        // Récupère le langage en fonction de l'extension du fichier
+        
         getFileLanguage(fileName) {
           const langMap = {
             'js': 'javascript',
@@ -616,11 +616,11 @@
           return langMap[fileExt] || 'plaintext';
         },
         
-        // Vérifie si un chemin existe dans l'arborescence
+        
         pathExists(path) {
           if (!path) return false;
           
-          // Diviser le chemin en segments
+          
           const segments = path.split('/');
           
           let currentNode = this.fileTree;
@@ -629,19 +629,19 @@
             const segment = segments[i];
             const isLastSegment = i === segments.length - 1;
             
-            // Si c'est le dernier segment, vérifier s'il existe déjà en tant que fichier dans ce dossier
+            
             if (isLastSegment) {
               if (currentNode.files && currentNode.files.some(f => f.name === segment)) {
                 return true;
               }
-              // Ou si c'est un dossier
+              
               if (currentNode.folders && currentNode.folders.some(f => f.name === segment)) {
                 return true;
               }
               return false;
             }
             
-            // Sinon, descendre dans l'arborescence
+            
             let found = false;
             if (currentNode.folders) {
               for (const folder of currentNode.folders) {
@@ -659,13 +659,13 @@
           return true;
         },
         
-        // Bascule l'état d'expansion d'un dossier
+        
         toggleFolder(folder) {
           folder.isExpanded = !folder.isExpanded;
           this.saveFileTree();
         },
         
-        // Télécharge et importe un fichier
+        
         async uploadFile(event) {
           const file = event.target.files[0];
           if (!file) return;
@@ -678,10 +678,10 @@
             reader.onload = (e) => {
               const content = e.target.result;
               
-              // Générer un ID unique
+              
               const fileId = this.generateId();
               
-              // Ajouter le fichier à la racine
+              
               this.fileTree.files.push({
                 id: fileId,
                 name: file.name,
@@ -689,10 +689,10 @@
                 lastModified: new Date().toISOString()
               });
               
-              // Sauvegarder l'arborescence
+              
               this.saveFileTree();
               
-              // Ouvrir le fichier importé
+              
               this.openFile({
                 id: fileId,
                 name: file.name,
@@ -712,12 +712,12 @@
             this.showToast(`Erreur: ${error.message}`, 'error');
             this.statusMessage = 'Prêt';
           } finally {
-            // Réinitialiser l'input file
+            
             event.target.value = '';
           }
         },
         
-        // Sauvegarde le fichier courant
+        
         saveFile() {
           if (!this.currentFile || !editor) return;
           
@@ -726,21 +726,21 @@
           try {
             const content = editor.getValue();
             
-            // Trouver et mettre à jour le fichier dans l'arborescence
+            
             this.updateFileInTree(this.fileTree, this.currentFile.id, content);
             
-            // Sauvegarder l'arborescence
+            
             this.saveFileTree();
             
-            // Mettre à jour le fichier courant
+            
             this.currentFile.content = content;
             this.currentFile.unsaved = false;
             
             this.showToast('Fichier sauvegardé', 'success');
             this.statusMessage = `Fichier ${this.currentFile.name} sauvegardé`;
             
-            // Si ce fichier a un fileHandle associé et l'API est disponible,
-            // le sauvegarder aussi sur le disque
+            
+            
             if (this.hasFileSystemAccessAPI && this.fileHandles.has(this.currentFile.id)) {
               this.saveFileToHandle(this.currentFile.id, content);
             }
@@ -751,9 +751,9 @@
           }
         },
         
-        // Met à jour le contenu d'un fichier dans l'arborescence
+        
         updateFileInTree(node, fileId, content) {
-          // Vérifier parmi les fichiers de ce nœud
+          
           if (node.files) {
             for (let i = 0; i < node.files.length; i++) {
               if (node.files[i].id === fileId) {
@@ -764,7 +764,7 @@
             }
           }
           
-          // Vérifier récursivement dans les dossiers
+          
           if (node.folders) {
             for (const folder of node.folders) {
               if (this.updateFileInTree(folder, fileId, content)) {
@@ -776,17 +776,17 @@
           return false;
         },
         
-        // Sauvegarde le fichier sur le disque
+        
         async saveFileAs() {
           if (!this.currentFile || !editor) return;
           
           this.statusMessage = 'Préparation de l\'enregistrement...';
           const content = editor.getValue();
           
-          // Utilise l'API File System Access si disponible (Chrome, Edge, Opera)
+          
           if (this.hasFileSystemAccessAPI) {
             try {
-              // Options pour la boîte de dialogue
+              
               const options = {
                 suggestedName: this.currentFile.name,
                 types: [{
@@ -795,19 +795,19 @@
                 }]
               };
               
-              // Ouvre la boîte de dialogue "Enregistrer sous"
+              
               const fileHandle = await window.showSaveFilePicker(options);
               
-              // Stocke le fileHandle pour une utilisation future
+              
               this.fileHandles.set(this.currentFile.id, fileHandle);
               
-              // Sauvegarde le contenu dans le fichier
+              
               await this.writeToFile(fileHandle, content);
               
               this.showToast('Fichier enregistré sur le disque', 'success');
               this.statusMessage = `Fichier enregistré sur le disque: ${fileHandle.name}`;
               
-              // Mettre à jour le nom du fichier dans l'application si nécessaire
+              
               if (this.currentFile.name !== fileHandle.name) {
                 this.updateFileNameInTree(this.fileTree, this.currentFile.id, fileHandle.name);
                 this.currentFile.name = fileHandle.name;
@@ -815,35 +815,35 @@
                 this.saveFileTree();
               }
               
-              // Marquer comme sauvegardé
+              
               this.currentFile.unsaved = false;
             } catch (error) {
-              // L'utilisateur a peut-être annulé la boîte de dialogue
+              
               if (error.name !== 'AbortError') {
                 this.showToast(`Erreur lors de l'enregistrement: ${error.message}`, 'error');
               }
               this.statusMessage = 'Prêt';
             }
           } 
-          // Méthode alternative pour Firefox et Safari
+          
           else {
             try {
-              // Créer un objet Blob avec le contenu
+              
               const blob = new Blob([content], { type: this.getMimeType(this.currentFile.name) });
               
-              // Créer un URL pour le blob
+              
               const url = URL.createObjectURL(blob);
               
-              // Créer un élément <a> pour déclencher le téléchargement
+              
               const a = document.createElement('a');
               a.href = url;
               a.download = this.currentFile.name;
               
-              // Ajouter l'élément à la page et cliquer dessus
+              
               document.body.appendChild(a);
               a.click();
               
-              // Nettoyer
+              
               setTimeout(() => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
@@ -852,7 +852,7 @@
               this.showToast('Fichier téléchargé', 'success');
               this.statusMessage = `Fichier téléchargé: ${this.currentFile.name}`;
               
-              // Marquer comme sauvegardé
+              
               this.currentFile.unsaved = false;
             } catch (error) {
               this.showToast(`Erreur lors du téléchargement: ${error.message}`, 'error');
@@ -861,9 +861,9 @@
           }
         },
         
-        // Met à jour le nom d'un fichier dans l'arborescence
+        
         updateFileNameInTree(node, fileId, newName) {
-          // Vérifier parmi les fichiers de ce nœud
+          
           if (node.files) {
             for (let i = 0; i < node.files.length; i++) {
               if (node.files[i].id === fileId) {
@@ -873,7 +873,7 @@
             }
           }
           
-          // Vérifier récursivement dans les dossiers
+          
           if (node.folders) {
             for (const folder of node.folders) {
               if (this.updateFileNameInTree(folder, fileId, newName)) {
@@ -885,7 +885,7 @@
           return false;
         },
         
-        // Sauvegarde le contenu dans un fileHandle existant
+        
         async saveFileToHandle(fileId, content) {
           const fileHandle = this.fileHandles.get(fileId);
           if (!fileHandle) return;
@@ -898,19 +898,19 @@
           }
         },
         
-        // Écrit le contenu dans un fichier
+        
         async writeToFile(fileHandle, content) {
-          // Crée un objet FileSystemWritableFileStream pour écrire dans
+          
           const writable = await fileHandle.createWritable();
           
-          // Écrit le contenu dans le fichier
+          
           await writable.write(content);
           
-          // Ferme le flux d'écriture
+          
           await writable.close();
         },
         
-        // Retourne le type MIME approprié pour le type de fichier (pour API File System Access)
+        
         getFileAcceptType(fileName) {
           const extension = fileName.split('.').pop().toLowerCase();
           const mimeTypes = {
@@ -927,7 +927,7 @@
           return mimeTypes[extension] || { 'text/plain': ['.txt'] };
         },
         
-        // Retourne le type MIME pour un fichier (pour la méthode de téléchargement)
+        
         getMimeType(fileName) {
           const extension = fileName.split('.').pop().toLowerCase();
           const mimeTypes = {
@@ -944,15 +944,15 @@
           return mimeTypes[extension] || 'text/plain';
         },
         
-        // Vérifie les capacités du navigateur pour l'enregistrement de fichiers
+        
         checkBrowserCapabilities() {
           this.hasFileSystemAccessAPI = 'showSaveFilePicker' in window;
         },
         
-        // Initialise la création d'un élément dans un dossier spécifique
+        
         createInFolder(folder, type) {
           this.createInFolderId = folder.id;
-          // Construire le chemin du dossier
+          
           this.createInFolderPath = this.getFilePath(folder);
           
           this.createModalType = type;
@@ -960,7 +960,7 @@
           this.showCreateModal = true;
         },
         
-        // Crée un nouveau fichier ou dossier
+        
         createNewItem() {
           if (!this.newItemName) {
             this.showToast('Veuillez saisir un nom', 'error');
@@ -982,9 +982,9 @@
           }
         },
         
-        // Crée un nouveau fichier
+        
         createNewFile() {
-          // Vérifier si le nom de fichier contient déjà une extension
+          
           let fileName = this.newItemName;
           if (!fileName.includes('.') && this.newFileType) {
             fileName = `${fileName}.${this.newFileType}`;
@@ -992,7 +992,7 @@
           
           this.statusMessage = `Création du fichier ${fileName}...`;
           
-          // Vérifier si un fichier avec le même nom existe déjà
+          
           const fullPath = this.createInFolderPath 
             ? `${this.createInFolderPath}/${fileName}`
             : fileName;
@@ -1001,10 +1001,10 @@
             throw new Error(`Un élément nommé ${fileName} existe déjà`);
           }
           
-          // Générer un ID unique
+          
           const fileId = this.generateId();
           
-          // Créer le nouveau fichier
+          
           const newFile = {
             id: fileId,
             name: fileName,
@@ -1012,17 +1012,17 @@
             lastModified: new Date().toISOString()
           };
           
-          // Ajouter le fichier à l'emplacement approprié
+          
           if (this.createInFolderId) {
             this.addFileToFolder(this.fileTree, this.createInFolderId, newFile);
           } else {
             this.fileTree.files.push(newFile);
           }
           
-          // Sauvegarder l'arborescence
+          
           this.saveFileTree();
           
-          // Ouvrir le nouveau fichier
+          
           this.openFile(newFile);
           
           this.showToast(`Fichier ${fileName} créé avec succès`, 'success');
@@ -1030,16 +1030,16 @@
           this.statusMessage = `Fichier ${fileName} créé et ouvert`;
         },
         
-        // Ajoute un fichier dans un dossier spécifique
+        
         addFileToFolder(node, folderId, file) {
-          // Vérifier si c'est le dossier cible
+          
           if (node.id === folderId) {
             if (!node.files) node.files = [];
             node.files.push(file);
             return true;
           }
           
-          // Rechercher récursivement dans les sous-dossiers
+          
           if (node.folders) {
             for (const folder of node.folders) {
               if (this.addFileToFolder(folder, folderId, file)) {
@@ -1048,7 +1048,7 @@
             }
           }
           
-          // Vérifier au niveau racine si node est l'arborescence complète
+          
           if (node.folders) {
             for (const folder of node.folders) {
               if (folder.id === folderId) {
@@ -1062,13 +1062,13 @@
           return false;
         },
         
-        // Crée un nouveau dossier
+        
         createNewFolder() {
           const folderName = this.newItemName;
           
           this.statusMessage = `Création du dossier ${folderName}...`;
           
-          // Vérifier si un dossier avec le même nom existe déjà
+          
           const fullPath = this.createInFolderPath 
             ? `${this.createInFolderPath}/${folderName}`
             : folderName;
@@ -1077,10 +1077,10 @@
             throw new Error(`Un élément nommé ${folderName} existe déjà`);
           }
           
-          // Générer un ID unique
+          
           const folderId = this.generateId();
           
-          // Créer le nouveau dossier
+          
           const newFolder = {
             id: folderId,
             name: folderName,
@@ -1089,14 +1089,14 @@
             files: []
           };
           
-          // Ajouter le dossier à l'emplacement approprié
+          
           if (this.createInFolderId) {
             this.addFolderToFolder(this.fileTree, this.createInFolderId, newFolder);
           } else {
             this.fileTree.folders.push(newFolder);
           }
           
-          // Sauvegarder l'arborescence
+          
           this.saveFileTree();
           
           this.showToast(`Dossier ${folderName} créé avec succès`, 'success');
@@ -1104,16 +1104,16 @@
           this.statusMessage = `Dossier ${folderName} créé`;
         },
         
-        // Ajoute un dossier dans un dossier spécifique
+        
         addFolderToFolder(node, parentId, folder) {
-          // Vérifier si c'est le dossier parent
+          
           if (node.id === parentId) {
             if (!node.folders) node.folders = [];
             node.folders.push(folder);
             return true;
           }
           
-          // Rechercher récursivement dans les sous-dossiers
+          
           if (node.folders) {
             for (const childFolder of node.folders) {
               if (this.addFolderToFolder(childFolder, parentId, folder)) {
@@ -1122,7 +1122,7 @@
             }
           }
           
-          // Vérifier au niveau racine si node est l'arborescence complète
+          
           if (node.folders) {
             for (const childFolder of node.folders) {
               if (childFolder.id === parentId) {
@@ -1136,7 +1136,7 @@
           return false;
         },
         
-        // Initialise la boîte de dialogue de confirmation de suppression
+        
         confirmDeleteItem(item) {
           const { type, item: targetItem } = item;
           const isFolder = type === 'folder';
@@ -1150,7 +1150,7 @@
           }
         },
         
-        // Supprime un élément (fichier ou dossier)
+        
         deleteItem(type, itemId) {
           if (type === 'file') {
             this.deleteFileFromTree(this.fileTree, itemId);
@@ -1158,10 +1158,10 @@
             this.deleteFolderFromTree(this.fileTree, itemId);
           }
           
-          // Sauvegarder l'arborescence
+          
           this.saveFileTree();
           
-          // Si le fichier supprimé est le fichier courant, fermer l'éditeur
+          
           if (this.currentFile && this.currentFile.id === itemId) {
             this.currentFile = null;
             if (editor) {
@@ -1174,9 +1174,9 @@
           this.statusMessage = 'Prêt';
         },
         
-        // Supprime un fichier de l'arborescence
+        
         deleteFileFromTree(node, fileId) {
-          // Supprimer parmi les fichiers de ce nœud
+          
           if (node.files) {
             const index = node.files.findIndex(f => f.id === fileId);
             if (index !== -1) {
@@ -1185,7 +1185,7 @@
             }
           }
           
-          // Rechercher récursivement dans les dossiers
+          
           if (node.folders) {
             for (const folder of node.folders) {
               if (this.deleteFileFromTree(folder, fileId)) {
@@ -1197,9 +1197,9 @@
           return false;
         },
         
-        // Supprime un dossier de l'arborescence
+        
         deleteFolderFromTree(node, folderId) {
-          // Supprimer parmi les dossiers de ce nœud
+          
           if (node.folders) {
             const index = node.folders.findIndex(f => f.id === folderId);
             if (index !== -1) {
@@ -1207,7 +1207,7 @@
               return true;
             }
             
-            // Rechercher récursivement dans les sous-dossiers
+            
             for (const folder of node.folders) {
               if (this.deleteFolderFromTree(folder, folderId)) {
                 return true;
@@ -1218,14 +1218,14 @@
           return false;
         },
         
-        // Initialiser le renommage d'un élément
+        
         startRenameItem(data) {
           this.renameItem = data;
           this.newItemName = data.item.name;
           this.showRenameModal = true;
         },
         
-        // Confirmer le renommage
+        
         renameItemConfirm() {
           if (!this.newItemName || !this.renameItem) {
             this.showToast('Veuillez saisir un nom valide', 'error');
@@ -1237,17 +1237,17 @@
             const oldName = item.name;
             const newName = this.newItemName;
             
-            // Vérifier si le nouveau nom est différent
+            
             if (oldName === newName) {
               this.showRenameModal = false;
               return;
             }
             
-            // Trouver le chemin actuel sans le nom du fichier/dossier
+            
             const currentPath = this.getFilePath(item);
             const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
             
-            // Vérifier si un élément avec le même nom existe déjà
+            
             const newPath = parentPath 
               ? `${parentPath}/${newName}`
               : newName;
@@ -1259,7 +1259,7 @@
             if (type === 'file') {
               this.renameFileInTree(this.fileTree, item.id, newName);
               
-              // Si c'est le fichier actuellement ouvert, mettre à jour les références
+              
               if (this.currentFile && this.currentFile.id === item.id) {
                 this.currentFile.name = newName;
                 this.currentFile.path = this.getFilePath({id: item.id, name: newName});
@@ -1268,7 +1268,7 @@
               this.renameFolderInTree(this.fileTree, item.id, newName);
             }
             
-            // Sauvegarder l'arborescence
+            
             this.saveFileTree();
             
             this.showToast(`"${oldName}" renommé en "${newName}"`, 'success');
@@ -1280,9 +1280,9 @@
           }
         },
         
-        // Renomme un fichier dans l'arborescence
+        
         renameFileInTree(node, fileId, newName) {
-          // Chercher parmi les fichiers de ce nœud
+          
           if (node.files) {
             for (let i = 0; i < node.files.length; i++) {
               if (node.files[i].id === fileId) {
@@ -1292,7 +1292,7 @@
             }
           }
           
-          // Rechercher récursivement dans les dossiers
+          
           if (node.folders) {
             for (const folder of node.folders) {
               if (this.renameFileInTree(folder, fileId, newName)) {
@@ -1304,9 +1304,9 @@
           return false;
         },
         
-        // Renomme un dossier dans l'arborescence
+        
         renameFolderInTree(node, folderId, newName) {
-          // Chercher parmi les dossiers de ce nœud
+          
           if (node.folders) {
             for (let i = 0; i < node.folders.length; i++) {
               if (node.folders[i].id === folderId) {
@@ -1315,7 +1315,7 @@
               }
             }
             
-            // Rechercher récursivement dans les sous-dossiers
+            
             for (const folder of node.folders) {
               if (this.renameFolderInTree(folder, folderId, newName)) {
                 return true;
@@ -1326,12 +1326,12 @@
           return false;
         },
         
-        // Affiche un toast de notification
+        
         showToast(message, type = 'success') {
           const toast = { message, type };
           this.toasts.push(toast);
           
-          // Retirer le toast après 3 secondes
+          
           setTimeout(() => {
             const index = this.toasts.indexOf(toast);
             if (index !== -1) {

@@ -6,18 +6,18 @@ const bodyParser = require('body-parser');
 const app = express();
 const port = 3000;
 
-// Middleware
+
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.set('view engine', 'ejs');
 
-// Page d'accueil : application Vue
+
 app.get('/', (req, res) => {
   res.render('index');
 });
 
-// Route pour sauvegarder un fichier
+
 app.post('/api/save', (req, res) => {
   const { content, fileName } = req.body;
   
@@ -25,17 +25,17 @@ app.post('/api/save', (req, res) => {
     return res.status(400).json({ error: 'Nom de fichier manquant' });
   }
 
-  // Créer le dossier 'files' s'il n'existe pas
+  
   const filesDir = path.join(__dirname, 'files');
   if (!fs.existsSync(filesDir)) {
     fs.mkdirSync(filesDir);
   }
 
-  // Chemin du fichier à sauvegarder
+  
   const filePath = path.join(filesDir, fileName);
 
   try {
-    // Écrire le contenu dans le fichier
+    
     fs.writeFileSync(filePath, content);
     res.json({ success: true, message: `Fichier ${fileName} sauvegardé avec succès` });
   } catch (error) {
@@ -44,11 +44,11 @@ app.post('/api/save', (req, res) => {
   }
 });
 
-// Route pour lister les fichiers
+
 app.get('/api/files', (req, res) => {
   const filesDir = path.join(__dirname, 'files');
   
-  // Créer le dossier 'files' s'il n'existe pas
+  
   if (!fs.existsSync(filesDir)) {
     fs.mkdirSync(filesDir);
     return res.json({ files: [] });
@@ -62,7 +62,7 @@ app.get('/api/files', (req, res) => {
         const stats = fs.statSync(filePath);
         
         return {
-          id: Buffer.from(file).toString('base64'), // ID unique basé sur le nom du fichier
+          id: Buffer.from(file).toString('base64'), 
           name: file,
           lastModified: stats.mtime.toISOString(),
           size: stats.size
@@ -76,7 +76,7 @@ app.get('/api/files', (req, res) => {
   }
 });
 
-// Route pour récupérer le contenu d'un fichier
+
 app.get('/api/files/:id', (req, res) => {
   try {
     const fileName = Buffer.from(req.params.id, 'base64').toString();
@@ -94,7 +94,7 @@ app.get('/api/files/:id', (req, res) => {
   }
 });
 
-// Route pour supprimer un fichier
+
 app.delete('/api/files/:id', (req, res) => {
   try {
     const fileName = Buffer.from(req.params.id, 'base64').toString();
@@ -113,5 +113,5 @@ app.delete('/api/files/:id', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Mini-VSCode écoute sur http://localhost:${port}`);
+  console.log(`Versus-Code écoute sur http://localhost:${port}`);
 });
